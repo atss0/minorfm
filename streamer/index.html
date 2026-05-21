@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MINOR.fm Streamer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      background: #080808;
+      color: #d0d0d0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 18px 28px;
+      border-bottom: 1px solid #161616;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .logo {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #fff;
+    }
+    .logo span { color: #888; font-weight: 400; }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .badge.live  { color: #ff3b3b; }
+    .badge.live  .badge-dot { background: #ff3b3b; animation: blink 1.4s ease-in-out infinite; }
+    .badge.idle  { color: #666; }
+    .badge.idle  .badge-dot { background: #666; }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    /* ── Layout ── */
+    main {
+      flex: 1;
+      padding: 28px;
+      max-width: 700px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #0f0f0f;
+      border: 1px solid #1c1c1c;
+      border-radius: 6px;
+      padding: 18px 20px;
+    }
+    .card-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #777;
+      margin-bottom: 14px;
+    }
+
+    /* ── Now Playing ── */
+    .now-playing-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+      min-height: 24px;
+    }
+    .stream-info {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+    .stream-info a { color: #999; text-decoration: none; }
+    .stream-info a:hover { color: #ccc; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .listener-count {
+      margin-left: auto;
+      font-size: 11px;
+      color: #777;
+    }
+
+    /* ── Audio Player ── */
+    .player-wrap {
+      margin-top: 14px;
+      display: none;
+    }
+    audio {
+      width: 100%;
+      height: 28px;
+      accent-color: #fff;
+    }
+
+    /* ── Buttons ── */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      line-height: 1;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .btn {
+      padding: 7px 13px;
+      background: #181818;
+      color: #bbb;
+      border: 1px solid #2e2e2e;
+    }
+    .btn:hover { background: #222; color: #ddd; }
+    .btn:disabled { opacity: .4; cursor: default; }
+
+    .btn-white {
+      padding: 7px 13px;
+      background: #e8e8e8;
+      color: #000;
+      border: 1px solid transparent;
+    }
+    .btn-white:hover { background: #fff; }
+
+    .btn-icon {
+      padding: 5px 8px;
+      background: transparent;
+      color: #777;
+      border: 1px solid transparent;
+      font-size: 15px;
+    }
+    .btn-icon:hover { color: #ff4444; background: rgba(255,68,68,.07); }
+
+    /* ── Add Form ── */
+    .add-row {
+      display: flex;
+      gap: 8px;
+    }
+    input[type="text"] {
+      flex: 1;
+      min-width: 0;
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      color: #d0d0d0;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 11px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]::placeholder { color: #555; }
+    input[type="text"]:focus { border-color: #555; }
+    input[type="file"] { display: none; }
+
+    /* ── Queue List ── */
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-height: 44px;
+    }
+
+    .queue-empty {
+      font-size: 12px;
+      color: #666;
+      padding: 14px 10px;
+      text-align: center;
+    }
+
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 10px;
+      background: #0a0a0a;
+      border: 1px solid #181818;
+      border-radius: 4px;
+      cursor: default;
+      transition: background .1s, border-color .1s, opacity .15s;
+      user-select: none;
+    }
+    .queue-item.dragging  { opacity: .3; }
+    .queue-item.drag-over { border-color: #383838; background: #131313; }
+
+    .drag-handle {
+      color: #555;
+      cursor: grab;
+      font-size: 15px;
+      flex-shrink: 0;
+      line-height: 1;
+      padding: 2px 3px;
+    }
+    .drag-handle:hover { color: #aaa; }
+    .drag-handle:active { cursor: grabbing; }
+
+    .track-num {
+      font-size: 10px;
+      color: #666;
+      width: 16px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .track-title {
+      flex: 1;
+      font-size: 12px;
+      color: #d0d0d0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-tag {
+      font-size: 9px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #666;
+      flex-shrink: 0;
+    }
+
+    /* ── Loop button active state ── */
+    .btn.active {
+      background: #1e1e1e;
+      color: #fff;
+      border-color: #555;
+    }
+
+    /* ── TTS ── */
+    .tts-settings {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tts-settings input[type="password"] {
+      flex: 1;
+      min-width: 160px;
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      color: #d0d0d0;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 11px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .tts-settings input[type="password"]:focus { border-color: #555; }
+    .tts-settings input[type="password"]::placeholder { color: #555; }
+
+    select {
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      color: #d0d0d0;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 10px;
+      outline: none;
+      cursor: pointer;
+    }
+    select:focus { border-color: #555; }
+
+    textarea {
+      width: 100%;
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      color: #d0d0d0;
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 10px 11px;
+      outline: none;
+      resize: vertical;
+      transition: border-color .15s;
+    }
+    textarea:focus { border-color: #555; }
+    textarea::placeholder { color: #555; }
+
+    .tts-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      gap: 8px;
+    }
+    .tts-hint {
+      font-size: 11px;
+      color: #666;
+    }
+    .tts-hint.error { color: #ff5555; }
+    .tts-hint.ok    { color: #55cc77; }
+
+    /* ── Status bar ── */
+    footer {
+      padding: 10px 28px;
+      border-top: 1px solid #1a1a1a;
+      font-size: 10px;
+      color: #666;
+      letter-spacing: .04em;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MINOR.fm <span>/ streamer</span></div>
+  <div class="badge idle" id="liveBadge">
+    <div class="badge-dot"></div>
+    <span id="liveLabel">IDLE</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Now Playing -->
+  <div class="card">
+    <div class="card-label">Now Playing</div>
+    <div class="now-playing-title" id="nowPlaying">—</div>
+    <div class="stream-info">
+      Stream URL: <a id="streamLink" href="/stream" target="_blank">/stream</a>
+    </div>
+    <div class="controls">
+      <button class="btn" onclick="skip()">⏭ Skip</button>
+      <button class="btn" id="loopBtn" onclick="toggleLoop()">↻ Loop: OFF</button>
+      <button class="btn" id="playerBtn" onclick="togglePlayer()">▶ Play in browser</button>
+      <span class="listener-count" id="listenerCount">0 listeners</span>
+    </div>
+    <div class="player-wrap" id="playerWrap">
+      <audio id="player" controls preload="none">
+        <source src="/stream" type="audio/mpeg">
+      </audio>
+    </div>
+  </div>
+
+  <!-- Add to Queue -->
+  <div class="card">
+    <div class="card-label">Add to Queue</div>
+    <div class="add-row">
+      <input
+        type="text"
+        id="urlInput"
+        placeholder="https://example.com/audio.mp3  or any stream URL"
+        onkeydown="if(event.key==='Enter') addURL()"
+      >
+      <button class="btn-white" onclick="addURL()">Add URL</button>
+      <button class="btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()">Upload</button>
+      <input
+        type="file"
+        id="fileInput"
+        accept=".mp3,.wav,.flac,.ogg,.aac,.m4a,.opus"
+        onchange="uploadFile(this)"
+      >
+    </div>
+  </div>
+
+  <!-- Queue -->
+  <div class="card">
+    <div class="card-label">Queue &nbsp;<span id="queueCount" style="color:#777">0</span></div>
+    <div class="queue-list" id="queueList">
+      <div class="queue-empty">Queue is empty — add a URL or upload a file</div>
+    </div>
+  </div>
+
+  <!-- ElevenLabs TTS -->
+  <div class="card">
+    <div class="card-label">ElevenLabs TTS</div>
+
+    <div class="tts-settings">
+      <input
+        type="password"
+        id="elApiKey"
+        placeholder="ElevenLabs API Key"
+        oninput="localStorage.setItem('el_api_key', this.value)"
+      >
+      <select id="elVoice" onchange="localStorage.setItem('el_voice', this.value)">
+        <optgroup label="★ Türkçe için önerilen">
+          <option value="XB0fDUnXU5powFXDhCwa">Charlotte (Free)</option>
+          <option value="onwK4e9ZLuTAKqWW03F9">Daniel (Free)</option>
+          <option value="N2lVS1w4EtoT3dr4eOWO">Callum (Free)</option>
+          <option value="XrExE9yKIg1WjnnlVkGX">Matilda (Free)</option>
+        </optgroup>
+        <optgroup label="Kadın sesleri">
+          <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Free)</option>
+          <option value="EXAVITQu4vr4xnSDxMaL">Bella (Free)</option>
+          <option value="AZnzlk1XvdvUeBnXmlld">Domi (Free)</option>
+          <option value="MF3mGyEYCl7XYWbV9V6O">Elli (Free)</option>
+          <option value="LcfcDJNUP1GQjkzn1xUU">Emily (Free)</option>
+          <option value="jsCqWAovK2LkecY7zXl4">Freya (Free)</option>
+          <option value="jBpfuIE2acCO8z3wKNLl">Gigi (Free)</option>
+          <option value="z9fAnlkpzviPz146aGWa">Glinda (Free)</option>
+          <option value="oWAxZDx7w5VEj9dCyTzz">Grace (Free)</option>
+          <option value="bVMeCyTHy58xNoL34h3p">Jeremy (Free)</option>
+          <option value="pFZP5JQG7iQjIQuC4Bku">Lily (Free)</option>
+          <option value="zrHiDhphv9ZnVXBqCLjz">Mimi (Free)</option>
+          <option value="pMsXgVXv3BLzUgSXRplE">Serena (Free)</option>
+          <option value="ThT5KcBeYPX3keUQqHPh">Dorothy (Free)</option>
+        </optgroup>
+        <optgroup label="Erkek sesleri">
+          <option value="pNInz6obpgDQGcFmaJgB">Adam (Free)</option>
+          <option value="ErXwobaYiN019PkySvjV">Antoni (Free)</option>
+          <option value="VR6AewLTigWG4xSOukaG">Arnold (Free)</option>
+          <option value="IKne3meq5aSn9XLyUdCD">Charlie (Free)</option>
+          <option value="2EiwWnXFnvU5JabPnv8n">Clyde (Free)</option>
+          <option value="CYw3kZ02Hs0563khs1Fj">Dave (Free)</option>
+          <option value="29vD33N1wnOsEx8nV7UT">Drew (Free)</option>
+          <option value="g5CIjZEefAph4nQFvHAz">Ethan (Free)</option>
+          <option value="D38z5RcWu1voky8WS1ja">Fin (Free)</option>
+          <option value="zcAOhNBS3c14rBihAFp1">Giovanni (Free)</option>
+          <option value="SOYHLrjzK2X1ezoPC6cr">Harry (Free)</option>
+          <option value="ZQe5CZNOzWyzPSCn5a3c">James (Free)</option>
+          <option value="t0jbNlBVZ17f02VDIeMI">Jessie (Free)</option>
+          <option value="Zlb1dXrM653N07WRdFW3">Joseph (Free)</option>
+          <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Free)</option>
+          <option value="TX3LPaxmHKxFdv7VOQHJ">Liam (Free)</option>
+          <option value="Yko7PKHZNXotIFUBG7I9">Matthew (Free)</option>
+          <option value="flq6f7yl4xJhdPVyMApo">Michael (Free)</option>
+          <option value="ODq5zmih8GrVes37Dy39">Patrick (Free)</option>
+          <option value="5Q0t7uMcjvnagumLfvZi">Paul (Free)</option>
+          <option value="yoZ06aMxZJJ28mfd3POQ">Sam (Free)</option>
+          <option value="GBv7mTt0atIp3Br8iCZE">Thomas (Free)</option>
+        </optgroup>
+      </select>
+      <select id="elModel" onchange="localStorage.setItem('el_model', this.value)">
+        <option value="eleven_multilingual_v2">Multilingual v2</option>
+        <option value="eleven_monolingual_v1">English v1</option>
+        <option value="eleven_turbo_v2_5">Turbo v2.5 (fast)</option>
+      </select>
+    </div>
+
+    <textarea
+      id="ttsText"
+      placeholder="Sıraya eklenecek metni buraya yaz…"
+      rows="4"
+    ></textarea>
+
+    <div class="tts-footer">
+      <span class="tts-hint" id="ttsStatus">API key'ini gir ve metni yaz</span>
+      <button class="btn-white" id="ttsBtn" onclick="generateTTS()">Oluştur &amp; Sıraya Ekle</button>
+    </div>
+  </div>
+
+</main>
+
+<footer id="statusBar">Idle</footer>
+
+<script>
+  let queue = [];
+  let dragSrcIdx = null;
+
+  // ── SSE ───────────────────────────────────────────────────────────────────
+
+  function connectSSE() {
+    const es = new EventSource('/events');
+    es.onmessage = () => { fetchStatus(); fetchQueue(); };
+    es.onerror   = () => { setTimeout(connectSSE, 3000); es.close(); };
+  }
+  connectSSE();
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+
+  async function fetchStatus() {
+    try {
+      const s = await fetch('/api/status').then(r => r.json());
+      const badge  = document.getElementById('liveBadge');
+      const label  = document.getElementById('liveLabel');
+      const title  = document.getElementById('nowPlaying');
+      const count  = document.getElementById('listenerCount');
+      const status = document.getElementById('statusBar');
+
+      if (s.playing && s.current) {
+        badge.className = 'badge live';
+        label.textContent = 'LIVE';
+        title.textContent = s.current.title;
+        status.textContent = `▶ ${s.current.title}`;
+      } else {
+        badge.className = 'badge idle';
+        label.textContent = 'IDLE';
+        title.textContent = '—';
+        status.textContent = 'Idle — add tracks to start streaming';
+      }
+      const n = s.listeners || 0;
+      count.textContent = n === 1 ? '1 listener' : `${n} listeners`;
+      setLoopUI(!!s.loop);
+    } catch (_) {}
+  }
+
+  async function fetchQueue() {
+    try {
+      queue = await fetch('/api/queue').then(r => r.json()) || [];
+      renderQueue();
+    } catch (_) {}
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  function renderQueue() {
+    const list = document.getElementById('queueList');
+    document.getElementById('queueCount').textContent = queue.length;
+
+    if (!queue.length) {
+      list.innerHTML = '<div class="queue-empty">Queue is empty — add a URL or upload a file</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    queue.forEach((track, i) => {
+      const el = document.createElement('div');
+      el.className = 'queue-item';
+      el.draggable = true;
+      el.dataset.index = i;
+      el.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <span class="track-num">${i + 1}</span>
+        <span class="track-title" title="${esc(track.title)}">${esc(track.title)}</span>
+        <span class="track-tag">${track.is_file ? 'file' : 'url'}</span>
+        <button class="btn-icon" title="Remove" onclick="removeTrack('${track.id}')">×</button>
+      `;
+      el.addEventListener('dragstart', onDragStart);
+      el.addEventListener('dragend',   onDragEnd);
+      el.addEventListener('dragover',  onDragOver);
+      el.addEventListener('dragleave', onDragLeave);
+      el.addEventListener('drop',      onDrop);
+      list.appendChild(el);
+    });
+  }
+
+  // ── Drag & Drop ───────────────────────────────────────────────────────────
+
+  function onDragStart(e) {
+    dragSrcIdx = +e.currentTarget.dataset.index;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function onDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
+  }
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
+    e.currentTarget.classList.add('drag-over');
+  }
+  function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+
+  async function onDrop(e) {
+    e.preventDefault();
+    const targetIdx = +e.currentTarget.dataset.index;
+    if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+
+    const moved = queue.splice(dragSrcIdx, 1)[0];
+    queue.splice(targetIdx, 0, moved);
+    dragSrcIdx = null;
+    renderQueue(); // optimistic
+
+    await fetch('/api/queue/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(queue.map(t => t.id)),
+    });
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  async function addURL() {
+    const inp = document.getElementById('urlInput');
+    const src = inp.value.trim();
+    if (!src) return;
+
+    const title = (() => {
+      try { return decodeURIComponent(new URL(src).pathname.split('/').pop() || src); }
+      catch { return src; }
+    })();
+
+    const r = await fetch('/api/queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: src, title }),
+    });
+    if (r.ok) { inp.value = ''; }
+    else { alert('Failed to add URL — check the server logs'); }
+  }
+
+  async function uploadFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const btn = document.getElementById('uploadBtn');
+    btn.textContent = 'Uploading…';
+    btn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      const r = await fetch('/api/upload', { method: 'POST', body: fd });
+      if (!r.ok) { alert('Upload failed: ' + await r.text()); }
+    } finally {
+      btn.textContent = 'Upload';
+      btn.disabled = false;
+      input.value = '';
+    }
+  }
+
+  async function removeTrack(id) {
+    queue = queue.filter(t => t.id !== id);
+    renderQueue(); // optimistic
+    await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+  }
+
+  async function skip() {
+    await fetch('/api/skip', { method: 'POST' });
+  }
+
+  function togglePlayer() {
+    const wrap = document.getElementById('playerWrap');
+    const player = document.getElementById('player');
+    const btn = document.getElementById('playerBtn');
+    if (wrap.style.display === 'block') {
+      wrap.style.display = 'none';
+      player.pause();
+      btn.textContent = '▶ Play in browser';
+    } else {
+      wrap.style.display = 'block';
+      player.load();
+      player.play().catch(() => {});
+      btn.textContent = '■ Stop player';
+    }
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Loop ──────────────────────────────────────────────────────────────────
+
+  let loopOn = false;
+
+  function setLoopUI(on) {
+    loopOn = on;
+    const btn = document.getElementById('loopBtn');
+    btn.textContent = `↻ Loop: ${on ? 'ON' : 'OFF'}`;
+    btn.classList.toggle('active', on);
+  }
+
+  async function toggleLoop() {
+    const next = !loopOn;
+    setLoopUI(next);
+    await fetch('/api/loop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loop: next }),
+    });
+  }
+
+  // ── TTS ───────────────────────────────────────────────────────────────────
+
+  async function generateTTS() {
+    const text   = document.getElementById('ttsText').value.trim();
+    const apiKey = document.getElementById('elApiKey').value.trim();
+    const voice  = document.getElementById('elVoice').value;
+    const model  = document.getElementById('elModel').value;
+    const status = document.getElementById('ttsStatus');
+    const btn    = document.getElementById('ttsBtn');
+
+    if (!apiKey) { setTTSStatus('API key gerekli', 'error'); return; }
+    if (!text)   { setTTSStatus('Metin gerekli', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Oluşturuluyor…';
+    setTTSStatus('ElevenLabs\'a gönderiliyor…', '');
+
+    try {
+      const r = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, api_key: apiKey, voice_id: voice, model_id: model }),
+      });
+
+      if (r.ok) {
+        document.getElementById('ttsText').value = '';
+        setTTSStatus('Sıraya eklendi ✓', 'ok');
+        setTimeout(() => setTTSStatus('API key\'ini gir ve metni yaz', ''), 3000);
+      } else {
+        const msg = await r.text();
+        setTTSStatus(msg || 'Hata oluştu', 'error');
+      }
+    } catch (e) {
+      setTTSStatus('Sunucuya ulaşılamadı', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Oluştur & Sıraya Ekle';
+    }
+  }
+
+  function setTTSStatus(msg, cls) {
+    const el = document.getElementById('ttsStatus');
+    el.textContent = msg;
+    el.className = 'tts-hint' + (cls ? ' ' + cls : '');
+  }
+
+  // Ctrl+Enter in textarea → generate
+  document.getElementById('ttsText').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generateTTS();
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  // Restore localStorage settings
+  const savedKey   = localStorage.getItem('el_api_key');
+  const savedVoice = localStorage.getItem('el_voice');
+  const savedModel = localStorage.getItem('el_model');
+  if (savedKey)   document.getElementById('elApiKey').value = savedKey;
+  if (savedVoice) document.getElementById('elVoice').value  = savedVoice;
+  if (savedModel) document.getElementById('elModel').value  = savedModel;
+
+  // Initial load
+  fetchStatus();
+  fetchQueue();
+</script>
+</body>
+</html>
