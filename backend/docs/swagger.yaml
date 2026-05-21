@@ -1,0 +1,18 @@
+basePath: /api
+host: localhost:8080
+info:
+  contact:
+    email: api@minor.fm
+    name: API Destek
+  description: MINOR.fm müzik ve kültür platformu REST API
+  license:
+    name: MIT
+  title: MINOR.fm API
+  version: "1.0"
+paths: {}
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

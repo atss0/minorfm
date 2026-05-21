@@ -1,0 +1,45 @@
+# ── Secrets / Environment ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.prod
+# .env.prod.example ve .env.example commit edilir (şablon)
+
+# ── Go ───────────────────────────────────────────────────────────────────────
+backend/bin/
+backend/tmp/          # air live reload cache
+*.exe
+*.test                # go test binary'leri
+*.out
+backend/coverage.out
+backend/coverage.html
+
+# ── Node / Next.js ───────────────────────────────────────────────────────────
+node_modules/
+web/.next/
+web/out/
+web/.turbo/
+web/coverage/
+web/test-results/
+web/playwright-report/
+web/blob-report/
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Editor ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Claude Code ──────────────────────────────────────────────────────────────
+.claude/
