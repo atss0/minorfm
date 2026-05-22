@@ -33,7 +33,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (loggedIn && isPublic) {
+  // reset-password must stay accessible even when logged in (email link)
+  const isResetPassword = pathname === '/reset-password' || pathname.startsWith('/reset-password/')
+  if (loggedIn && isPublic && !isResetPassword) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 

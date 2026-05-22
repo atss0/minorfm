@@ -398,6 +398,15 @@
     </div>
   </div>
 
+  <!-- Live Mic -->
+  <div class="card">
+    <div class="card-label">Canlı Yayın</div>
+    <div class="controls">
+      <button class="btn" id="micBtn" onclick="toggleMic()">🎙 Başlat</button>
+      <span id="micStatus" style="font-size:11px;color:#666;">Mikrofon kapalı</span>
+    </div>
+  </div>
+
   <!-- ElevenLabs TTS -->
   <div class="card">
     <div class="card-label">ElevenLabs TTS</div>
@@ -411,6 +420,7 @@
       >
       <select id="elVoice" onchange="localStorage.setItem('el_voice', this.value)">
         <optgroup label="★ Türkçe için önerilen">
+          <option value="RXCCWbOxP7Hisa63Xsv5">Adam – Calm, Relaxing and Informative</option>
           <option value="XB0fDUnXU5powFXDhCwa">Charlotte (Free)</option>
           <option value="onwK4e9ZLuTAKqWW03F9">Daniel (Free)</option>
           <option value="N2lVS1w4EtoT3dr4eOWO">Callum (Free)</option>
@@ -481,6 +491,13 @@
 <footer id="statusBar">Idle</footer>
 
 <script>
+  const AUTH = '__AUTH_TOKEN__' ? 'Basic __AUTH_TOKEN__' : '';
+
+  function apiFetch(url, opts = {}) {
+    if (AUTH) opts.headers = { 'Authorization': AUTH, ...(opts.headers || {}) };
+    return fetch(url, opts);
+  }
+
   let queue = [];
   let dragSrcIdx = null;
 
@@ -497,7 +514,7 @@
 
   async function fetchStatus() {
     try {
-      const s = await fetch('/api/status').then(r => r.json());
+      const s = await apiFetch('/api/status').then(r => r.json());
       const badge  = document.getElementById('liveBadge');
       const label  = document.getElementById('liveLabel');
       const title  = document.getElementById('nowPlaying');
@@ -523,7 +540,7 @@
 
   async function fetchQueue() {
     try {
-      queue = await fetch('/api/queue').then(r => r.json()) || [];
+      queue = await apiFetch('/api/queue').then(r => r.json()) || [];
       renderQueue();
     } catch (_) {}
   }
@@ -590,7 +607,7 @@
     dragSrcIdx = null;
     renderQueue(); // optimistic
 
-    await fetch('/api/queue/reorder', {
+    await apiFetch('/api/queue/reorder', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(queue.map(t => t.id)),
@@ -609,7 +626,7 @@
       catch { return src; }
     })();
 
-    const r = await fetch('/api/queue', {
+    const r = await apiFetch('/api/queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source: src, title }),
@@ -630,7 +647,7 @@
     fd.append('file', file);
 
     try {
-      const r = await fetch('/api/upload', { method: 'POST', body: fd });
+      const r = await apiFetch('/api/upload', { method: 'POST', body: fd });
       if (!r.ok) { alert('Upload failed: ' + await r.text()); }
     } finally {
       btn.textContent = 'Upload';
@@ -642,11 +659,11 @@
   async function removeTrack(id) {
     queue = queue.filter(t => t.id !== id);
     renderQueue(); // optimistic
-    await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
   }
 
   async function skip() {
-    await fetch('/api/skip', { method: 'POST' });
+    await apiFetch('/api/skip', { method: 'POST' });
   }
 
   function togglePlayer() {
@@ -685,11 +702,74 @@
   async function toggleLoop() {
     const next = !loopOn;
     setLoopUI(next);
-    await fetch('/api/loop', {
+    await apiFetch('/api/loop', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ loop: next }),
     });
+  }
+
+  // ── Live Mic ──────────────────────────────────────────────────────────────
+
+  let micStream = null, micRecorder = null, micWS = null;
+
+  async function toggleMic() {
+    micWS ? stopMic() : startMic();
+  }
+
+  async function startMic() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (_) {
+      setMicStatus('Mikrofon izni gerekli', true); return;
+    }
+
+    const token = AUTH ? AUTH.slice(6) : '';
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    micWS = new WebSocket(`${proto}://${location.host}/api/mic?token=${encodeURIComponent(token)}`);
+    micWS.binaryType = 'arraybuffer';
+
+    micWS.onopen = () => {
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus' : 'audio/webm';
+      micRecorder = new MediaRecorder(micStream, { mimeType: mime });
+      micRecorder.ondataavailable = e => {
+        if (e.data.size > 0 && micWS && micWS.readyState === WebSocket.OPEN)
+          e.data.arrayBuffer().then(buf => micWS.send(buf));
+      };
+      micRecorder.start(100);
+      const btn = document.getElementById('micBtn');
+      btn.textContent = '⏹ Durdur';
+      btn.classList.add('active');
+      setMicStatus('🔴 Canlı yayın aktif', false);
+    };
+
+    micWS.onclose = e => {
+      if (e.code === 1006 && !micRecorder) {
+        setMicStatus('Başka bir yayın aktif', true);
+        if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+        micWS = null;
+      } else {
+        stopMic();
+      }
+    };
+    micWS.onerror = () => {};
+  }
+
+  function stopMic() {
+    if (micRecorder) { micRecorder.stop(); micRecorder = null; }
+    if (micStream)   { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (micWS)       { micWS.close(); micWS = null; }
+    const btn = document.getElementById('micBtn');
+    btn.textContent = '🎙 Başlat';
+    btn.classList.remove('active');
+    setMicStatus('Mikrofon kapalı', false);
+  }
+
+  function setMicStatus(msg, err) {
+    const el = document.getElementById('micStatus');
+    el.textContent = msg;
+    el.style.color = err ? '#ff5555' : '#666';
   }
 
   // ── TTS ───────────────────────────────────────────────────────────────────
@@ -710,7 +790,7 @@
     setTTSStatus('ElevenLabs\'a gönderiliyor…', '');
 
     try {
-      const r = await fetch('/api/tts', {
+      const r = await apiFetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, api_key: apiKey, voice_id: voice, model_id: model }),

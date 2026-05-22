@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
 
@@ -16,6 +16,7 @@ type FormData = z.infer<typeof schema>
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { setAuth } = useAuthStore()
   const {
     register,
@@ -28,7 +29,8 @@ export default function LoginForm() {
     try {
       const res = await api.post('/api/auth/login', data)
       setAuth(res.data.user, res.data.access_token, res.data.refresh_token)
-      router.push('/')
+      const next = searchParams.get('next') ?? '/'
+      router.replace(next)
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data

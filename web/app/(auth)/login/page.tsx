@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import LoginForm from '@/components/auth/LoginForm'
 
@@ -14,7 +15,9 @@ export default function LoginPage() {
           <p className="text-muted mt-2 text-sm">Hesabına giriş yap</p>
         </div>
 
-        <LoginForm />
+        <Suspense>
+          <LoginForm />
+        </Suspense>
 
         <div className="space-y-2 text-center">
           <p className="text-muted text-sm">

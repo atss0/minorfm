@@ -5,17 +5,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
-  SkipBack,
-  SkipForward,
-  Play,
-  Pause,
-  Shuffle,
-  Repeat,
   Volume2,
+  VolumeX,
   Bell,
   User,
   Menu,
-  Heart,
   MessageCircle,
   LogOut,
   Settings,
@@ -25,29 +19,8 @@ import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
 import api from '@/lib/api'
 
-function fmt(s: number) {
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
-}
-
 export default function Header() {
-  const {
-    isPlaying,
-    currentTrack,
-    volume,
-    progress,
-    isShuffle,
-    isRepeat,
-    togglePlay,
-    prev,
-    next,
-    setVolume,
-    setProgress,
-    toggleShuffle,
-    toggleRepeat,
-  } = usePlayerStore()
-
+  const { volume, setVolume } = usePlayerStore()
   const { user, logout } = useAuthStore()
   const { toggleSidebar, toggleChat, notificationCount } = useUIStore()
   const router = useRouter()
@@ -72,8 +45,8 @@ export default function Header() {
     router.push('/login')
   }
 
-  const duration = currentTrack?.duration ?? 0
-  const pct = duration > 0 ? (progress / duration) * 100 : 0
+  const isMuted = volume === 0
+  const toggleMute = () => setVolume(isMuted ? 0.8 : 0)
 
   return (
     <header className="h-14 bg-surface border-b border-border flex items-center px-4 gap-2 shrink-0">
@@ -92,77 +65,16 @@ export default function Header() {
         </Link>
       </div>
 
-      {/* ── Center: player (takes all remaining space) ────────────────────── */}
-      <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
-
-        {/* Transport controls */}
-        <div className="flex items-center gap-0.5 shrink-0">
+      {/* ── Center: volume control ────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center gap-2">
           <button
-            onClick={prev}
+            onClick={toggleMute}
             className="p-1.5 text-muted hover:text-white transition-colors"
-            aria-label="Önceki"
+            aria-label={isMuted ? 'Sesi aç' : 'Sesi kapat'}
           >
-            <SkipBack size={15} />
+            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
-          <button
-            onClick={togglePlay}
-            disabled={!currentTrack}
-            className="p-1.5 text-white hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label={isPlaying ? 'Durdur' : 'Oynat'}
-          >
-            {isPlaying ? <Pause size={19} /> : <Play size={19} fill="currentColor" />}
-          </button>
-          <button
-            onClick={next}
-            className="p-1.5 text-muted hover:text-white transition-colors"
-            aria-label="Sonraki"
-          >
-            <SkipForward size={15} />
-          </button>
-          <button
-            onClick={toggleShuffle}
-            className={`p-1.5 transition-colors hidden sm:block ${isShuffle ? 'text-primary' : 'text-muted hover:text-white'}`}
-            aria-label="Karıştır"
-          >
-            <Shuffle size={13} />
-          </button>
-          <button
-            onClick={toggleRepeat}
-            className={`p-1.5 transition-colors hidden sm:block ${isRepeat ? 'text-primary' : 'text-muted hover:text-white'}`}
-            aria-label="Tekrar"
-          >
-            <Repeat size={13} />
-          </button>
-        </div>
-
-        {/* Progress bar */}
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          <span className="text-xs text-muted shrink-0 tabular-nums w-8 text-right">
-            {fmt(progress)}
-          </span>
-          <div className="relative flex-1 h-1 bg-border rounded-full min-w-0">
-            <div
-              className="absolute inset-y-0 left-0 bg-primary rounded-full pointer-events-none"
-              style={{ width: `${pct}%` }}
-            />
-            <input
-              type="range"
-              min={0}
-              max={duration || 100}
-              value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer"
-              aria-label="Süre"
-            />
-          </div>
-          <span className="text-xs text-muted shrink-0 tabular-nums w-8">
-            {fmt(duration)}
-          </span>
-        </div>
-
-        {/* Volume — fixed narrow width so thumb never overlaps right icons */}
-        <div className="hidden md:flex items-center gap-1 shrink-0 w-[52px]">
-          <Volume2 size={13} className="text-muted shrink-0" />
           <input
             type="range"
             min={0}
@@ -170,33 +82,13 @@ export default function Header() {
             step={0.02}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
-            className="w-full"
-            style={{ maxWidth: 36 }}
-            aria-label="Ses"
+            className="w-24"
+            aria-label="Ses seviyesi"
           />
         </div>
-
-        {/* Track info */}
-        {currentTrack && (
-          <div className="hidden lg:flex items-center gap-2 shrink-0 max-w-[150px]">
-            {currentTrack.cover_url && (
-              <Image
-                src={currentTrack.cover_url}
-                alt={currentTrack.title}
-                width={26}
-                height={26}
-                className="rounded shrink-0 object-cover"
-              />
-            )}
-            <div className="min-w-0">
-              <p className="text-xs font-semibold truncate leading-tight">{currentTrack.artist}</p>
-              <p className="text-xs text-muted truncate leading-tight">{currentTrack.title}</p>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Right: chat + actions ─────────────────────────────────────────── */}
+      {/* ── Right: chat + notifications + user ────────────────────────────── */}
       <div className="flex items-center gap-0.5 shrink-0">
         <button
           onClick={toggleChat}

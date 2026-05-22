@@ -12,13 +12,14 @@ import (
 type listener = chan []byte
 
 type Broadcaster struct {
-	mu      sync.RWMutex
-	subs    map[listener]struct{}
-	queue   *Queue
-	skip    chan struct{}
-	current *Track
-	playing bool
-	loop    bool
+	mu        sync.RWMutex
+	subs      map[listener]struct{}
+	queue     *Queue
+	skip      chan struct{}
+	current   *Track
+	playing   bool
+	loop      bool
+	micActive bool
 
 	sseMu   sync.RWMutex
 	sseSubs map[chan struct{}]struct{}
@@ -100,8 +101,34 @@ func (b *Broadcaster) IsLoop() bool {
 	return b.loop
 }
 
+func (b *Broadcaster) StartMic() {
+	b.mu.Lock()
+	b.micActive = true
+	b.mu.Unlock()
+	b.Skip()
+	b.notify()
+}
+
+func (b *Broadcaster) StopMic() {
+	b.mu.Lock()
+	b.micActive = false
+	b.mu.Unlock()
+	b.notify()
+}
+
+func (b *Broadcaster) IsMicActive() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.micActive
+}
+
 func (b *Broadcaster) Run() {
 	for {
+		if b.IsMicActive() {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
 		track := b.queue.Pop()
 		if track == nil {
 			b.mu.Lock()

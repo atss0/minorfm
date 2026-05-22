@@ -14,12 +14,13 @@ export default function PostCardArticle({ post, priority }: { post: Post; priori
   return (
     <Link href={`/post/${post.id}`} className="block group">
       {cover && (
-        <div className="relative w-full aspect-[4/5] sm:aspect-[3/4] max-h-[500px] rounded-lg overflow-hidden mb-3 bg-border">
+        <div className="w-full flex justify-center items-center bg-surface rounded-lg overflow-hidden mb-3 max-h-[500px]">
           <Image
             src={cover}
             alt={post.title}
-            fill
-            className="object-cover group-hover:opacity-90 transition-opacity rounded-lg"
+            width={800}
+            height={600}
+            className="w-auto h-auto max-h-[500px] object-contain group-hover:opacity-90 transition-opacity rounded-lg"
             unoptimized
             priority={priority}
           />

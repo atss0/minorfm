@@ -34,22 +34,26 @@ function ConnectionDot({ connected }: { connected: boolean }) {
 function MessageRow({ msg }: { msg: ChatMessageType }) {
   return (
     <div className="flex items-start gap-2">
-      <div className="w-6 h-6 rounded-full bg-border overflow-hidden flex items-center justify-center shrink-0 mt-0.5">
-        {msg.avatar_url ? (
-          <Image
-            src={msg.avatar_url}
-            alt={msg.username}
-            width={24}
-            height={24}
-            className="object-cover"
-            unoptimized
-          />
-        ) : (
-          <User size={12} className="text-muted" />
-        )}
-      </div>
+      <Link href={`/profile/${msg.username}`} className="shrink-0 mt-0.5">
+        <div className="w-6 h-6 rounded-full bg-border overflow-hidden flex items-center justify-center">
+          {msg.avatar_url ? (
+            <Image
+              src={msg.avatar_url}
+              alt={msg.username}
+              width={24}
+              height={24}
+              className="object-cover"
+              unoptimized
+            />
+          ) : (
+            <User size={12} className="text-muted" />
+          )}
+        </div>
+      </Link>
       <div className="min-w-0">
-        <span className="text-xs font-semibold text-primary">@{msg.username}</span>
+        <Link href={`/profile/${msg.username}`} className="text-xs font-semibold text-primary hover:underline">
+          @{msg.username}
+        </Link>
         {msg.badge != null && (
           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1 py-0.5 rounded bg-primary text-white ml-1">
             👑 #{msg.badge}

@@ -101,8 +101,15 @@ export default function PostDetailView({ postId }: Props) {
       <div className="bg-surface rounded-xl border border-border overflow-hidden">
         {/* Cover photo for articles */}
         {coverUrl && post.post_type === 'article' ? (
-          <div className="relative w-full aspect-[16/7] bg-border">
-            <Image src={coverUrl} alt={post.title} fill className="object-cover" unoptimized />
+          <div className="w-full flex justify-center items-center bg-surface max-h-[500px] overflow-hidden">
+            <Image
+              src={coverUrl}
+              alt={post.title}
+              width={900}
+              height={600}
+              className="w-auto h-auto max-h-[500px] object-contain"
+              unoptimized
+            />
           </div>
         ) : null}
 

@@ -74,11 +74,23 @@ services:
     networks:
       - proxy
 
+  streamer:
+    build: ./streamer
+    restart: unless-stopped
+    environment:
+      STREAMER_USER: ${STREAMER_USER:-admin}
+      STREAMER_PASS: ${STREAMER_PASS}
+    volumes:
+      - streamer_uploads:/app/uploads
+    networks:
+      - proxy
+
 volumes:
   npm_data:
   npm_certs:
   pgdata:
   redisdata:
+  streamer_uploads:
 
 networks:
   backend:

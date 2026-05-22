@@ -1,29 +1,55 @@
 'use client'
 
+import { useEffect } from 'react'
+import axios from 'axios'
 import { useUIStore } from '@/store/uiStore'
 import { useChatStore } from '@/store/chatStore'
 import { useChat } from '@/hooks/useChat'
 import { useRadio } from '@/hooks/useRadio'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useAuthStore } from '@/store/authStore'
 import AudioPlayer from '@/components/player/AudioPlayer'
 import Header from './Header'
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar'
 
+function isExpiringSoon(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' && payload.exp < Date.now() / 1000 + 300
+  } catch {
+    return false
+  }
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { sidebarOpen, chatOpen } = useUIStore()
   const activeRoom = useChatStore((s) => s.activeRoom)
 
-  // Persistent connections — survive sidebar open/close
   useChat(activeRoom)
   useRadio()
   useNotifications()
 
+  // Proactively refresh the access token 5 minutes before expiry
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const { accessToken, refreshToken, setAccessToken, logout } = useAuthStore.getState()
+      if (!accessToken || !refreshToken) return
+      if (!isExpiringSoon(accessToken)) return
+      try {
+        const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+        const { data } = await axios.post(`${base}/api/auth/refresh`, { refresh_token: refreshToken })
+        setAccessToken(data.access_token)
+      } catch {
+        logout()
+      }
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Hidden audio element drives real playback */}
       <AudioPlayer />
-
       <Header />
 
       <div className="flex flex-1 overflow-hidden">

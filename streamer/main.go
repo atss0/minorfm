@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,34 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+var (
+	adminUser = envOr("STREAMER_USER", "admin")
+	adminPass = envOr("STREAMER_PASS", "")
+)
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func basicAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if adminPass == "" {
+			next(w, r)
+			return
+		}
+		u, p, ok := r.BasicAuth()
+		if !ok || u != adminUser || p != adminPass {
+			w.Header().Set("WWW-Authenticate", `Basic realm="streamer"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
 
 //go:embed index.html
 var indexPage []byte
@@ -36,17 +65,18 @@ func main() {
 	go bc.Run()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleIndex)
-	mux.HandleFunc("/stream", handleStream)
-	mux.HandleFunc("/events", handleSSE)
-	mux.HandleFunc("/api/status", handleStatus)
-	mux.HandleFunc("/api/queue", handleQueue)
-	mux.HandleFunc("/api/queue/reorder", handleReorder)
-	mux.HandleFunc("/api/queue/", handleQueueItem)
-	mux.HandleFunc("/api/skip", handleSkip)
-	mux.HandleFunc("/api/loop", handleLoop)
-	mux.HandleFunc("/api/upload", handleUpload)
-	mux.HandleFunc("/api/tts", handleTTS)
+	mux.HandleFunc("/", basicAuth(handleIndex))
+	mux.HandleFunc("/stream", handleStream)   // public — listeners
+	mux.HandleFunc("/events", handleSSE)      // public — SSE for listeners
+	mux.HandleFunc("/api/status", basicAuth(handleStatus))
+	mux.HandleFunc("/api/queue", basicAuth(handleQueue))
+	mux.HandleFunc("/api/queue/reorder", basicAuth(handleReorder))
+	mux.HandleFunc("/api/queue/", basicAuth(handleQueueItem))
+	mux.HandleFunc("/api/skip", basicAuth(handleSkip))
+	mux.HandleFunc("/api/loop", basicAuth(handleLoop))
+	mux.HandleFunc("/api/upload", basicAuth(handleUpload))
+	mux.HandleFunc("/api/tts", basicAuth(handleTTS))
+	mux.HandleFunc("/api/mic", handleMicWS)
 
 	addr := ":7000"
 	log.Printf("admin  → http://localhost%s", addr)
@@ -62,7 +92,12 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(indexPage)
+	if adminPass == "" {
+		w.Write(indexPage)
+		return
+	}
+	token := base64.StdEncoding.EncodeToString([]byte(adminUser + ":" + adminPass))
+	w.Write(bytes.ReplaceAll(indexPage, []byte("__AUTH_TOKEN__"), []byte(token)))
 }
 
 // ── Stream ───────────────────────────────────────────────────────────────────
@@ -111,6 +146,7 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	ch := bc.subscribeSSE()
 	defer bc.unsubscribeSSE(ch)
@@ -364,7 +400,7 @@ func handleTTS(w http.ResponseWriter, r *http.Request) {
 
 	if resp.StatusCode != http.StatusOK {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		http.Error(w, fmt.Sprintf("elevenlabs %d: %s", resp.StatusCode, string(msg)), http.StatusBadGateway)
+		http.Error(w, fmt.Sprintf("elevenlabs %d: %s", resp.StatusCode, string(msg)), http.StatusUnprocessableEntity)
 		return
 	}
 

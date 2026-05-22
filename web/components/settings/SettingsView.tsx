@@ -51,10 +51,10 @@ function AvatarSection() {
     setError('')
     try {
       const form = new FormData()
-      form.append('file', file)
+      form.append('avatar', file)
       const res = await api.post('/api/media/avatar', form)
       if (user && accessToken && refreshToken) {
-        setAuth({ ...user, avatar_url: res.data.url }, accessToken, refreshToken)
+        setAuth({ ...user, avatar_url: res.data.avatar_url }, accessToken, refreshToken)
       }
     } catch {
       setError('Yükleme başarısız, tekrar dene')
@@ -70,7 +70,7 @@ function AvatarSection() {
       <div className="flex items-center gap-5">
         <div className="relative w-20 h-20 rounded-full overflow-hidden bg-border shrink-0">
           {user?.avatar_url ? (
-            <Image src={user.avatar_url} alt={user.username} fill className="object-cover" unoptimized />
+            <Image src={user.avatar_url} alt={user.username} fill className="object-contain" unoptimized />
           ) : (
             <div className="flex items-center justify-center h-full">
               <User size={28} className="text-muted" />

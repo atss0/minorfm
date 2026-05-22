@@ -32,7 +32,6 @@ export default function LeftSidebar() {
     retry: false,
   })
 
-  // Use API data if non-empty, otherwise fall back to seed list
   const categories =
     rawCategories && rawCategories.length > 0 ? rawCategories : SEED_CATEGORIES
 
@@ -42,6 +41,17 @@ export default function LeftSidebar() {
     enabled: !!user,
     staleTime: 60_000,
   })
+
+  const { data: onlineUsers = [] } = useQuery<UserType[]>({
+    queryKey: ['online-users'],
+    queryFn: () => api.get('/api/users/online').then((r) => r.data),
+    enabled: !!user && following.length > 0,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: false,
+  })
+
+  const onlineIds = new Set(onlineUsers.map((u) => u.id))
 
   return (
     <nav className="py-4 px-3 space-y-5 bg-bg h-full">
@@ -92,18 +102,23 @@ export default function LeftSidebar() {
                   href={`/profile/${u.username}`}
                   className="flex items-center gap-2.5 px-2 py-1.5 rounded text-sm text-muted hover:text-white hover:bg-surface/50 transition-colors"
                 >
-                  <div className="relative w-6 h-6 rounded-full bg-border overflow-hidden flex items-center justify-center shrink-0">
-                    {u.avatar_url ? (
-                      <Image
-                        src={u.avatar_url}
-                        alt={u.username}
-                        width={24}
-                        height={24}
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <User size={12} className="text-muted" />
+                  <div className="relative w-6 h-6 shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-border overflow-hidden flex items-center justify-center">
+                      {u.avatar_url ? (
+                        <Image
+                          src={u.avatar_url}
+                          alt={u.username}
+                          width={24}
+                          height={24}
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <User size={12} className="text-muted" />
+                      )}
+                    </div>
+                    {onlineIds.has(u.id) && (
+                      <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green-400 border border-bg" />
                     )}
                   </div>
                   <span className="truncate">{u.username}</span>

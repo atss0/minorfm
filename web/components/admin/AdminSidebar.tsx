@@ -10,17 +10,19 @@ import {
   Tag,
   Radio,
   Ticket,
+  Megaphone,
   ArrowLeft,
 } from 'lucide-react'
 
 const NAV = [
-  { href: '/admin',            label: 'Dashboard',   icon: LayoutDashboard },
-  { href: '/admin/users',      label: 'Kullanıcılar', icon: Users },
-  { href: '/admin/posts',      label: 'İçerikler',   icon: FileText },
-  { href: '/admin/comments',   label: 'Yorumlar',    icon: MessageSquare },
-  { href: '/admin/categories', label: 'Kategoriler', icon: Tag },
-  { href: '/admin/radio',      label: 'Radyo',       icon: Radio },
-  { href: '/admin/invites',    label: 'Davetler',    icon: Ticket },
+  { href: '/admin',                 label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/admin/users',           label: 'Kullanıcılar', icon: Users },
+  { href: '/admin/posts',           label: 'İçerikler',   icon: FileText },
+  { href: '/admin/comments',        label: 'Yorumlar',    icon: MessageSquare },
+  { href: '/admin/categories',      label: 'Kategoriler', icon: Tag },
+  { href: '/admin/radio',           label: 'Radyo',       icon: Radio },
+  { href: '/admin/invites',         label: 'Davetler',    icon: Ticket },
+  { href: '/admin/announcements',   label: 'Duyurular',   icon: Megaphone },
 ]
 
 export default function AdminSidebar() {
