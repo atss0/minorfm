@@ -2,12 +2,9 @@ package router
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	wsconn "github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/csrf"
 	fiberSwagger "github.com/swaggo/fiber-swagger"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -40,20 +37,6 @@ func healthHandler(db *gorm.DB, rdb *redis.Client) fiber.Handler {
 }
 
 func Setup(app *fiber.App, db *gorm.DB, rdb *redis.Client, cfg *config.Config) {
-	// CSRF protection: double-submit cookie pattern.
-	// Auth endpoints are excluded — they're protected by rate limiting instead.
-	// WebSocket upgrades are excluded (they're GET requests anyway, but be explicit).
-	app.Use(csrf.New(csrf.Config{
-		KeyLookup:      "header:X-CSRF-Token",
-		CookieName:     "csrf_",
-		CookieHTTPOnly: false,
-		Expiration:     1 * time.Hour,
-		Next: func(c *fiber.Ctx) bool {
-			return wsconn.IsWebSocketUpgrade(c) ||
-				strings.HasPrefix(c.Path(), "/api/auth/")
-		},
-	}))
-
 	// Health check (before any auth middleware)
 	app.Get("/health", healthHandler(db, rdb))
 

@@ -16,13 +16,6 @@ api.interceptors.request.use((config) => {
         if (token) config.headers.Authorization = `Bearer ${token}`
       } catch {}
     }
-    // CSRF token for state-mutating requests — read from the csrf_ cookie set by the backend
-    const method = config.method?.toUpperCase()
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method ?? '')) {
-      const csrf = document.cookie.match(/(?:^|; )csrf_=([^;]*)/)?.[1]
-        ?? document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content
-      if (csrf) config.headers['X-CSRF-Token'] = csrf
-    }
   }
   return config
 })
