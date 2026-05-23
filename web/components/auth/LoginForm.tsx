@@ -30,7 +30,9 @@ export default function LoginForm() {
       const res = await api.post('/api/auth/login', data)
       setAuth(res.data.user, res.data.access_token, res.data.refresh_token)
       const next = searchParams.get('next') ?? '/'
-      router.replace(next)
+      // Hard navigation ensures the logged_in cookie is included in the
+      // server request before middleware runs its auth check.
+      window.location.href = next
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data

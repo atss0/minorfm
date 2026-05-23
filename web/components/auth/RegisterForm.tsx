@@ -82,7 +82,7 @@ export default function RegisterForm() {
         password: data.password,
       })
       setAuth(res.data.user, res.data.access_token, res.data.refresh_token)
-      router.push('/')
+      window.location.href = '/'
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data
