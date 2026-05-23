@@ -9,6 +9,7 @@ interface PlayerState {
   progress: number
   isShuffle: boolean
   isRepeat: boolean
+  autoplayBlocked: boolean
   play: (track?: Track) => void
   pause: () => void
   togglePlay: () => void
@@ -16,6 +17,7 @@ interface PlayerState {
   setProgress: (progress: number) => void
   setTrack: (track: Track) => void
   setQueue: (queue: Track[]) => void
+  setAutoplayBlocked: (v: boolean) => void
   next: () => void
   prev: () => void
   toggleShuffle: () => void
@@ -30,6 +32,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   progress: 0,
   isShuffle: false,
   isRepeat: false,
+  autoplayBlocked: false,
 
   play: (track) => {
     if (track) set({ currentTrack: track, isPlaying: true, progress: 0 })
@@ -41,6 +44,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setProgress: (progress) => set({ progress }),
   setTrack: (track) => set({ currentTrack: track, progress: 0 }),
   setQueue: (queue) => set({ queue }),
+  setAutoplayBlocked: (v) => set({ autoplayBlocked: v }),
 
   next: () => {
     const { queue, currentTrack, isShuffle } = get()

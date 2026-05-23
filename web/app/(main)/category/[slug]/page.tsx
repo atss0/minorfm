@@ -10,7 +10,7 @@ interface Props {
 
 async function fetchCategory(slug: string) {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+    const apiUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
     const res = await fetch(`${apiUrl}/api/categories/${slug}`, { next: { revalidate: 3600 } })
     if (!res.ok) return null
     return res.json()

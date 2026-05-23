@@ -9,6 +9,7 @@ export default function AudioPlayer() {
   const volume = usePlayerStore((s) => s.volume)
   const progress = usePlayerStore((s) => s.progress)
   const isRepeat = usePlayerStore((s) => s.isRepeat)
+  const autoplayBlocked = usePlayerStore((s) => s.autoplayBlocked)
   const setProgress = usePlayerStore((s) => s.setProgress)
   const next = usePlayerStore((s) => s.next)
 
@@ -22,7 +23,7 @@ export default function AudioPlayer() {
     audio.load()
     if (isPlaying) {
       audio.play().catch(() => {
-        usePlayerStore.getState().pause()
+        usePlayerStore.getState().setAutoplayBlocked(true)
       })
     }
   }, [currentTrack?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -33,13 +34,27 @@ export default function AudioPlayer() {
     if (!audio) return
     if (isPlaying) {
       audio.play().catch(() => {
-        // Autoplay blocked (no user gesture yet) — reset UI to paused so user can click manually
-        usePlayerStore.getState().pause()
+        // Autoplay blocked — keep isPlaying true, wait for user gesture
+        usePlayerStore.getState().setAutoplayBlocked(true)
       })
     } else {
       audio.pause()
     }
   }, [isPlaying])
+
+  // Retry on first user gesture when autoplay was blocked
+  useEffect(() => {
+    if (!autoplayBlocked) return
+    const tryPlay = () => {
+      const audio = audioRef.current
+      if (!audio) return
+      audio.play()
+        .then(() => usePlayerStore.getState().setAutoplayBlocked(false))
+        .catch(() => {})
+    }
+    document.addEventListener('click', tryPlay, { once: true })
+    return () => document.removeEventListener('click', tryPlay)
+  }, [autoplayBlocked])
 
   // Sync volume
   useEffect(() => {

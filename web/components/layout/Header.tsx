@@ -20,8 +20,21 @@ import { useUIStore } from '@/store/uiStore'
 import { globalLogout } from '@/store/globalLogout'
 import api from '@/lib/api'
 
+function EqBar({ delay }: { delay: number }) {
+  return (
+    <div
+      className="w-[3px] rounded-full bg-primary"
+      style={{
+        height: '100%',
+        transformOrigin: 'bottom',
+        animation: `wave 0.85s ease-in-out ${delay}s infinite`,
+      }}
+    />
+  )
+}
+
 export default function Header() {
-  const { volume, setVolume } = usePlayerStore()
+  const { volume, setVolume, currentTrack, isPlaying, autoplayBlocked } = usePlayerStore()
   const { user } = useAuthStore()
   const { toggleSidebar, toggleChat, notificationCount } = useUIStore()
   const router = useRouter()
@@ -49,6 +62,9 @@ export default function Header() {
   const isMuted = volume === 0
   const toggleMute = () => setVolume(isMuted ? 0.8 : 0)
 
+  // Bars animate when radio is live and audio is actually playing
+  const isAnimating = isPlaying && !autoplayBlocked
+
   return (
     <header className="h-14 bg-surface border-b border-border flex items-center px-4 gap-2 shrink-0">
 
@@ -66,26 +82,78 @@ export default function Header() {
         </Link>
       </div>
 
-      {/* ── Center: volume control ────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleMute}
-            className="p-1.5 text-muted hover:text-white transition-colors"
-            aria-label={isMuted ? 'Sesi aç' : 'Sesi kapat'}
-          >
-            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.02}
-            value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            className="w-24"
-            aria-label="Ses seviyesi"
-          />
+      {/* ── Center: live radio bar ────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center min-w-0 px-2">
+        <div className="flex items-center gap-2.5 bg-bg border border-border rounded-full px-4 py-2 w-full max-w-[400px]">
+
+          {/* LIVE badge */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-[9px] font-black tracking-[0.15em] text-primary uppercase select-none">
+              Canlı
+            </span>
+          </div>
+
+          {/* Separator */}
+          <div className="w-px h-3 bg-border shrink-0" />
+
+          {/* Equalizer bars */}
+          <div className="flex items-end gap-[3px] h-3 shrink-0">
+            {isAnimating ? (
+              <>
+                <EqBar delay={0} />
+                <EqBar delay={0.17} />
+                <EqBar delay={0.34} />
+                <EqBar delay={0.51} />
+              </>
+            ) : (
+              <>
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="w-[3px] rounded-full bg-muted/40"
+                    style={{ height: '35%', transformOrigin: 'bottom' }}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Track info */}
+          <div className="flex-1 min-w-0">
+            {autoplayBlocked ? (
+              <p className="text-[11px] text-muted truncate">Dinlemek için tıkla…</p>
+            ) : currentTrack ? (
+              <p className="text-[11px] truncate">
+                <span className="text-muted">{currentTrack.artist}</span>
+                <span className="text-border mx-1">·</span>
+                <span className="text-white">{currentTrack.title}</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted truncate">Yayın bekleniyor…</p>
+            )}
+          </div>
+
+          {/* Volume control */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={toggleMute}
+              className="text-muted hover:text-white transition-colors"
+              aria-label={isMuted ? 'Sesi aç' : 'Sesi kapat'}
+            >
+              {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.02}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              className="w-16"
+              aria-label="Ses seviyesi"
+            />
+          </div>
         </div>
       </div>
 
