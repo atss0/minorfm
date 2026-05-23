@@ -76,3 +76,10 @@ func (c *ChatMessage) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+func (i *Invite) BeforeCreate(tx *gorm.DB) error {
+	if i.ID == uuid.Nil {
+		i.ID = uuid.New()
+	}
+	return nil
+}

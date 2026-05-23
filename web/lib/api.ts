@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { API_BASE } from '@/lib/config'
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -15,9 +16,20 @@ api.interceptors.request.use((config) => {
         if (token) config.headers.Authorization = `Bearer ${token}`
       } catch {}
     }
+    // CSRF token for state-mutating requests — read from the csrf_ cookie set by the backend
+    const method = config.method?.toUpperCase()
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method ?? '')) {
+      const csrf = document.cookie.match(/(?:^|; )csrf_=([^;]*)/)?.[1]
+        ?? document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content
+      if (csrf) config.headers['X-CSRF-Token'] = csrf
+    }
   }
   return config
 })
+
+// Global kilit: eş zamanlı 401 yanıtlarının her biri ayrı refresh denemesi
+// başlatmasını önler. İlk istek promise'i oluşturur, diğerleri onu bekler.
+let refreshPromise: Promise<string | null> | null = null
 
 api.interceptors.response.use(
   (res) => res,
@@ -25,31 +37,43 @@ api.interceptors.response.use(
     const original = error.config
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
-      try {
-        // Lazy import avoids circular dependency; .getState() works outside React
-        const { useAuthStore } = await import('@/store/authStore')
-        const { refreshToken, setAccessToken, logout } = useAuthStore.getState()
-        if (!refreshToken) {
-          logout()
-          if (typeof window !== 'undefined') window.location.href = '/login'
-          return Promise.reject(error)
-        }
 
-        const { data } = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/refresh`,
-          { refresh_token: refreshToken }
-        )
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          try {
+            // Lazy import avoids circular dependency; .getState() works outside React
+            const { useAuthStore } = await import('@/store/authStore')
+            const { refreshToken, setAccessToken, logout } = useAuthStore.getState()
+            if (!refreshToken) {
+              logout()
+              if (typeof window !== 'undefined') window.location.href = '/login'
+              return null
+            }
 
-        // Update the Zustand store — persist middleware syncs localStorage and
-        // the [accessToken] dep in WS hooks causes them to reconnect automatically.
-        setAccessToken(data.access_token)
+            const { data } = await axios.post(
+              `${API_BASE}/api/auth/refresh`,
+              { refresh_token: refreshToken }
+            )
 
-        original.headers.Authorization = `Bearer ${data.access_token}`
+            // Update the Zustand store — persist middleware syncs localStorage and
+            // the [accessToken] dep in WS hooks causes them to reconnect automatically.
+            setAccessToken(data.access_token)
+            return data.access_token as string
+          } catch {
+            const { useAuthStore } = await import('@/store/authStore')
+            useAuthStore.getState().logout()
+            if (typeof window !== 'undefined') window.location.href = '/login'
+            return null
+          } finally {
+            refreshPromise = null
+          }
+        })()
+      }
+
+      const newToken = await refreshPromise
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`
         return api(original)
-      } catch {
-        const { useAuthStore } = await import('@/store/authStore')
-        useAuthStore.getState().logout()
-        if (typeof window !== 'undefined') window.location.href = '/login'
       }
     }
     return Promise.reject(error)

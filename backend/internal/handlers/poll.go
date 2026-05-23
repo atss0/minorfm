@@ -73,18 +73,43 @@ func (h *Handler) VotePoll(c *fiber.Ctx) error {
 		if existing.OptionID == oid {
 			return fiber.NewError(fiber.StatusConflict, "already voted for this option")
 		}
-		// Change vote
-		h.DB.Model(&models.PollOption{}).Where("id = ?", existing.OptionID).UpdateColumn("vote_count", gorm.Expr("vote_count - 1"))
-		h.DB.Model(&existing).Update("option_id", oid)
-		h.DB.Model(&models.PollOption{}).Where("id = ?", oid).UpdateColumn("vote_count", gorm.Expr("vote_count + 1"))
+		// Change vote — wrap in transaction to keep vote_count consistent
+		if txErr := h.DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&models.PollOption{}).
+				Where("id = ?", existing.OptionID).
+				UpdateColumn("vote_count", gorm.Expr("GREATEST(vote_count - 1, 0)")).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&existing).Update("option_id", oid).Error; err != nil {
+				return err
+			}
+			return tx.Model(&models.PollOption{}).
+				Where("id = ?", oid).
+				UpdateColumn("vote_count", gorm.Expr("vote_count + 1")).Error
+		}); txErr != nil {
+			return txErr
+		}
 		return c.JSON(fiber.Map{"voted": true})
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
-	h.DB.Create(&models.PollVote{PollID: pid, OptionID: oid, UserID: uid})
-	h.DB.Model(&models.PollOption{}).Where("id = ?", oid).UpdateColumn("vote_count", gorm.Expr("vote_count + 1"))
+	// First vote — wrap in transaction to keep vote_count consistent
+	if txErr := h.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&models.PollVote{PollID: pid, OptionID: oid, UserID: uid}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.PollOption{}).
+			Where("id = ?", oid).
+			UpdateColumn("vote_count", gorm.Expr("vote_count + 1")).Error
+	}); txErr != nil {
+		// Unique constraint violation means a concurrent request already inserted the vote
+		if errors.Is(txErr, gorm.ErrDuplicatedKey) {
+			return fiber.NewError(fiber.StatusConflict, "already voted")
+		}
+		return txErr
+	}
 	return c.JSON(fiber.Map{"voted": true})
 }
 

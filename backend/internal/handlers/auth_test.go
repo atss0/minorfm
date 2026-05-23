@@ -14,6 +14,7 @@ import (
 	"github.com/atss0/minorfm/internal/models"
 	"github.com/glebarez/sqlite"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -29,7 +30,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *handlers.Handler) {
 	if err != nil {
 		t.Fatalf("failed to open in-memory sqlite: %v", err)
 	}
-	db.AutoMigrate(&models.User{})
+	db.AutoMigrate(&models.User{}, &models.Invite{})
 	t.Cleanup(func() {
 		if sqlDB, err := db.DB(); err == nil {
 			sqlDB.Close()
@@ -63,13 +64,27 @@ func setupTestApp(t *testing.T) (*fiber.App, *handlers.Handler) {
 	return app, h
 }
 
+func createTestInvite(t *testing.T, h *handlers.Handler, code string) {
+	t.Helper()
+	invite := models.Invite{
+		Code:      code,
+		CreatedBy: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+	}
+	if err := h.DB.Create(&invite).Error; err != nil {
+		t.Fatalf("createTestInvite: %v", err)
+	}
+}
+
 func TestRegister(t *testing.T) {
-	app, _ := setupTestApp(t)
+	app, h := setupTestApp(t)
+	code := "TEST-INVITE-001"
+	createTestInvite(t, h, code)
 
 	body, _ := json.Marshal(map[string]string{
-		"username": "testuser",
-		"email":    "test@example.com",
-		"password": "password123",
+		"username":    "testuser",
+		"email":       "test@example.com",
+		"password":    "password123",
+		"invite_code": code,
 	})
 
 	req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
@@ -87,22 +102,30 @@ func TestRegister(t *testing.T) {
 }
 
 func TestRegister_DuplicateEmail(t *testing.T) {
-	app, _ := setupTestApp(t)
+	app, h := setupTestApp(t)
+	code := "TEST-INVITE-001"
+	createTestInvite(t, h, code)
 
 	body, _ := json.Marshal(map[string]string{
-		"username": "user1",
-		"email":    "dup@example.com",
-		"password": "password123",
+		"username":    "user1",
+		"email":       "dup@example.com",
+		"password":    "password123",
+		"invite_code": code,
 	})
 
 	req1 := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	app.Test(req1) //nolint
 
+	// Second user needs a new invite (first one is now used)
+	code2 := "TEST-INVITE-002"
+	createTestInvite(t, h, code2)
+
 	body2, _ := json.Marshal(map[string]string{
-		"username": "user2",
-		"email":    "dup@example.com",
-		"password": "password123",
+		"username":    "user2",
+		"email":       "dup@example.com",
+		"password":    "password123",
+		"invite_code": code2,
 	})
 	req2 := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")
@@ -114,13 +137,16 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	app, _ := setupTestApp(t)
+	app, h := setupTestApp(t)
+	code := "TEST-INVITE-001"
+	createTestInvite(t, h, code)
 
 	// Register first
 	regBody, _ := json.Marshal(map[string]string{
-		"username": "loginuser",
-		"email":    "login@example.com",
-		"password": "password123",
+		"username":    "loginuser",
+		"email":       "login@example.com",
+		"password":    "password123",
+		"invite_code": code,
 	})
 	regReq := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(regBody))
 	regReq.Header.Set("Content-Type", "application/json")

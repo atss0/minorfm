@@ -8,6 +8,7 @@ import { useChat } from '@/hooks/useChat'
 import { useRadio } from '@/hooks/useRadio'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useAuthStore } from '@/store/authStore'
+import { globalLogout } from '@/store/globalLogout'
 import AudioPlayer from '@/components/player/AudioPlayer'
 import Header from './Header'
 import LeftSidebar from './LeftSidebar'
@@ -33,7 +34,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Proactively refresh the access token 5 minutes before expiry
   useEffect(() => {
     const interval = setInterval(async () => {
-      const { accessToken, refreshToken, setAccessToken, logout } = useAuthStore.getState()
+      const { accessToken, refreshToken, setAccessToken } = useAuthStore.getState()
       if (!accessToken || !refreshToken) return
       if (!isExpiringSoon(accessToken)) return
       try {
@@ -41,7 +42,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         const { data } = await axios.post(`${base}/api/auth/refresh`, { refresh_token: refreshToken })
         setAccessToken(data.access_token)
       } catch {
-        logout()
+        globalLogout()
       }
     }, 60_000)
     return () => clearInterval(interval)

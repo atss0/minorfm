@@ -2,13 +2,15 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 
-// 7-day cookie — matches refresh token TTL.
+// Matches the refresh token TTL on the backend (7 days).
 // Middleware only checks presence, not value; real auth is Bearer token on API calls.
+const SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 days in seconds
+
 function setLoggedInCookie(role?: string) {
   if (typeof document === 'undefined') return
-  document.cookie = 'logged_in=1; path=/; max-age=604800; SameSite=Lax'
+  document.cookie = `logged_in=1; path=/; max-age=${SESSION_COOKIE_MAX_AGE}; SameSite=Lax`
   if (role) {
-    document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`
+    document.cookie = `user_role=${role}; path=/; max-age=${SESSION_COOKIE_MAX_AGE}; SameSite=Lax`
   }
 }
 

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import PostDetailView from '@/components/post/PostDetailView'
 
 interface Props {
@@ -34,5 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PostPage({ params }: Props) {
   const { id } = await params
+  const post = await fetchPost(id)
+  if (!post) notFound()
   return <PostDetailView postId={id} />
 }

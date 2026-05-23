@@ -9,24 +9,37 @@ interface Props {
   postId: string
 }
 
+const PAGE_SIZE = 20
+
 export default function CommentSection({ postId }: Props) {
   const { user } = useAuthStore()
   const { data: comments, isLoading } = useComments(postId)
   const createComment = useCreateComment(postId)
   const [body, setBody] = useState('')
+  const [showCount, setShowCount] = useState(PAGE_SIZE)
 
   function submit() {
     if (!body.trim()) return
     createComment.mutate(
       { body: body.trim() },
-      { onSuccess: () => setBody('') }
+      {
+        onSuccess: () => {
+          setBody('')
+          // Reveal new comment if it would be past the current page
+          setShowCount((c) => Math.max(c, (comments?.length ?? 0) + 1))
+        },
+      }
     )
   }
 
+  const allComments = comments ?? []
+  const visibleComments = allComments.slice(0, showCount)
+  const remaining = allComments.length - showCount
+
   return (
     <div className="mt-8">
-      <h3 className="text-sm font-semibold text-text mb-4">
-        Yorumlar {comments && comments.length > 0 && `(${comments.length})`}
+      <h3 className="text-sm font-semibold text-white mb-4">
+        Yorumlar {allComments.length > 0 && `(${allComments.length})`}
       </h3>
 
       {user ? (
@@ -42,14 +55,14 @@ export default function CommentSection({ postId }: Props) {
           </div>
           <div className="flex-1 flex gap-2">
             <input
-              className="flex-1 bg-surface border border-border rounded px-3 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent"
+              className="flex-1 bg-surface border border-border rounded px-3 py-2 text-sm text-white placeholder:text-muted focus:outline-none focus:border-primary"
               placeholder="Yorum yaz…"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
             />
             <button
-              className="px-3 py-2 bg-accent text-white text-sm rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="px-3 py-2 bg-primary text-white text-sm rounded hover:opacity-90 transition-opacity disabled:opacity-50"
               onClick={submit}
               disabled={createComment.isPending || !body.trim()}
             >
@@ -60,7 +73,7 @@ export default function CommentSection({ postId }: Props) {
       ) : (
         <p className="text-sm text-muted mb-6">
           Yorum yapmak için{' '}
-          <a href="/login" className="text-accent hover:underline">
+          <a href="/login" className="text-primary hover:underline">
             giriş yapın
           </a>
         </p>
@@ -78,12 +91,22 @@ export default function CommentSection({ postId }: Props) {
             </div>
           ))}
         </div>
-      ) : comments && comments.length > 0 ? (
-        <div className="divide-y divide-border">
-          {comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} postId={postId} />
-          ))}
-        </div>
+      ) : visibleComments.length > 0 ? (
+        <>
+          <div className="divide-y divide-border">
+            {visibleComments.map((comment) => (
+              <CommentItem key={comment.id} comment={comment} postId={postId} />
+            ))}
+          </div>
+          {remaining > 0 && (
+            <button
+              onClick={() => setShowCount((c) => c + PAGE_SIZE)}
+              className="mt-4 w-full py-2.5 text-sm text-muted hover:text-white border border-border hover:border-muted/60 rounded-lg transition-colors"
+            >
+              Daha fazla yükle ({remaining} yorum daha)
+            </button>
+          )}
+        </>
       ) : (
         <p className="text-sm text-muted text-center py-8">Henüz yorum yok.</p>
       )}

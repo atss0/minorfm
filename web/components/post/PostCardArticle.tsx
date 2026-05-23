@@ -21,7 +21,6 @@ export default function PostCardArticle({ post, priority }: { post: Post; priori
             width={800}
             height={600}
             className="w-auto h-auto max-h-[500px] object-contain group-hover:opacity-90 transition-opacity rounded-lg"
-            unoptimized
             priority={priority}
           />
         </div>

@@ -3,12 +3,20 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log"
+	"net/url"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/atss0/minorfm/internal/models"
 	"github.com/gofiber/fiber/v2"
 )
+
+var slugRegex = regexp.MustCompile(`^[a-z0-9-]{1,50}$`)
+
+const maxAdminPage = 1000
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +62,9 @@ func (h *Handler) AdminGetStats(c *fiber.Ctx) error {
 
 func (h *Handler) AdminGetUsers(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
+	if page > maxAdminPage {
+		return fiber.NewError(fiber.StatusBadRequest, "Sayfa numarası çok yüksek.")
+	}
 	limit := c.QueryInt("limit", 50)
 	if limit > 100 {
 		limit = 100
@@ -64,7 +75,8 @@ func (h *Handler) AdminGetUsers(c *fiber.Ctx) error {
 
 	query := h.DB.Model(&models.User{})
 	if q != "" {
-		like := "%" + q + "%"
+		escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(q)
+		like := "%" + escaped + "%"
 		query = query.Where("username ILIKE ? OR email ILIKE ?", like, like)
 	}
 	if role != "" {
@@ -165,6 +177,9 @@ func (h *Handler) AdminUnbanUser(c *fiber.Ctx) error {
 
 func (h *Handler) AdminGetPosts(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
+	if page > maxAdminPage {
+		return fiber.NewError(fiber.StatusBadRequest, "Sayfa numarası çok yüksek.")
+	}
 	limit := c.QueryInt("limit", 50)
 	if limit > 100 {
 		limit = 100
@@ -207,7 +222,11 @@ func (h *Handler) AdminDeletePost(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "post not found")
 	}
 	h.DB.Delete(&post)
-	h.bustFeedCache(post.Category.Slug)
+	if post.Category.Slug != "" {
+		if err := h.bustFeedCache(post.Category.Slug); err != nil {
+			log.Printf("feed cache temizlenemedi (%s): %v", post.Category.Slug, err)
+		}
+	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -224,27 +243,34 @@ func (h *Handler) AdminPinPost(c *fiber.Ctx) error {
 	} else {
 		h.DB.Model(&post).Updates(map[string]interface{}{"pinned": true, "pinned_at": now})
 	}
-	h.bustFeedCache(post.Category.Slug)
+	if post.Category.Slug != "" {
+		if err := h.bustFeedCache(post.Category.Slug); err != nil {
+			log.Printf("feed cache temizlenemedi (%s): %v", post.Category.Slug, err)
+		}
+	}
 	return c.JSON(fiber.Map{"pinned": !post.Pinned})
 }
 
-func (h *Handler) bustFeedCache(categorySlug string) {
+func (h *Handler) bustFeedCache(categorySlug string) error {
 	if h.RDB == nil {
-		return
+		return nil
 	}
 	ctx := context.Background()
-	h.RDB.Del(ctx,
+	return h.RDB.Del(ctx,
 		fmt.Sprintf("feed:cache:new:%s:1", categorySlug),
 		fmt.Sprintf("feed:cache:top:%s:1", categorySlug),
 		"feed:cache:new::1",
 		"feed:cache:top::1",
-	)
+	).Err()
 }
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) AdminGetComments(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
+	if page > maxAdminPage {
+		return fiber.NewError(fiber.StatusBadRequest, "Sayfa numarası çok yüksek.")
+	}
 	limit := c.QueryInt("limit", 50)
 	if limit > 100 {
 		limit = 100
@@ -297,6 +323,9 @@ func (h *Handler) AdminCreateCategory(c *fiber.Ctx) error {
 	if req.Name == "" || req.Slug == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "name and slug are required")
 	}
+	if !slugRegex.MatchString(req.Slug) {
+		return fiber.NewError(fiber.StatusBadRequest, "Slug yalnızca küçük harf, rakam ve - içerebilir (maks 50 karakter).")
+	}
 
 	cat := models.Category{
 		Name: req.Name, Slug: req.Slug, Icon: req.Icon,
@@ -332,6 +361,9 @@ func (h *Handler) AdminUpdateCategory(c *fiber.Ctx) error {
 		updates["name"] = req.Name
 	}
 	if req.Slug != "" {
+		if !slugRegex.MatchString(req.Slug) {
+			return fiber.NewError(fiber.StatusBadRequest, "Slug yalnızca küçük harf, rakam ve - içerebilir (maks 50 karakter).")
+		}
 		updates["slug"] = req.Slug
 	}
 	if req.Icon != "" {
@@ -344,7 +376,17 @@ func (h *Handler) AdminUpdateCategory(c *fiber.Ctx) error {
 		updates["order"] = req.Order
 	}
 
+	oldSlug := cat.Slug
 	h.DB.Model(&cat).Updates(updates)
+	// Bust cache for old slug and new slug (if changed) so stale feed is not served
+	if err := h.bustFeedCache(oldSlug); err != nil {
+		log.Printf("feed cache temizlenemedi (%s): %v", oldSlug, err)
+	}
+	if req.Slug != "" && req.Slug != oldSlug {
+		if err := h.bustFeedCache(req.Slug); err != nil {
+			log.Printf("feed cache temizlenemedi (%s): %v", req.Slug, err)
+		}
+	}
 	return c.JSON(cat)
 }
 
@@ -362,6 +404,9 @@ func (h *Handler) AdminDeleteCategory(c *fiber.Ctx) error {
 	}
 
 	h.DB.Delete(&cat)
+	if err := h.bustFeedCache(cat.Slug); err != nil {
+		log.Printf("feed cache temizlenemedi (%s): %v", cat.Slug, err)
+	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -468,6 +513,12 @@ func (h *Handler) AdminCreateAnnouncement(c *fiber.Ctx) error {
 	if req.Body == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "body is required")
 	}
+	if req.URL != "" {
+		parsed, err := url.Parse(req.URL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fiber.NewError(fiber.StatusBadRequest, "Geçersiz URL. Yalnızca http/https desteklenmektedir.")
+		}
+	}
 
 	ann := models.Announcement{Body: req.Body, URL: req.URL, Active: true, ExpiresAt: req.ExpiresAt}
 	if err := h.DB.Create(&ann).Error; err != nil {
@@ -499,6 +550,10 @@ func (h *Handler) AdminUpdateAnnouncement(c *fiber.Ctx) error {
 		updates["body"] = req.Body
 	}
 	if req.URL != "" {
+		parsed, err := url.Parse(req.URL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fiber.NewError(fiber.StatusBadRequest, "Geçersiz URL. Yalnızca http/https desteklenmektedir.")
+		}
 		updates["url"] = req.URL
 	}
 	if req.Active != nil {

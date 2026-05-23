@@ -7,7 +7,7 @@ import (
 )
 
 type Invite struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	Code      string     `gorm:"uniqueIndex;size:32;not null"                  json:"code"`
 	CreatedBy uuid.UUID  `gorm:"type:uuid;not null"                            json:"created_by"`
 	Creator   User       `gorm:"foreignKey:CreatedBy"                          json:"creator,omitempty"`

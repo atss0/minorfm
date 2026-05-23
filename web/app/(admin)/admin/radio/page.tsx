@@ -64,7 +64,6 @@ function SortableTrackRow({
           width={36}
           height={36}
           className="rounded object-cover shrink-0"
-          unoptimized
         />
       ) : (
         <div className="w-9 h-9 rounded bg-border flex items-center justify-center shrink-0">
@@ -208,7 +207,6 @@ export default function AdminRadioPage() {
                 width={56}
                 height={56}
                 className="rounded-lg object-cover shrink-0"
-                unoptimized
               />
             ) : (
               <div className="w-14 h-14 rounded-lg bg-border flex items-center justify-center shrink-0">

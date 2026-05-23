@@ -53,7 +53,6 @@ export default function AdminTopBar() {
               width={28}
               height={28}
               className="rounded-full object-cover"
-              unoptimized
             />
           ) : (
             <div className="w-7 h-7 rounded-full bg-border flex items-center justify-center text-xs font-bold text-white">

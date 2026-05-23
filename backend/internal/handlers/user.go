@@ -60,7 +60,14 @@ func (h *Handler) UpdateMe(c *fiber.Ctx) error {
 		updates["avatar_url"] = req.AvatarURL
 	}
 	if req.Username != "" {
+		if !usernameRegex.MatchString(req.Username) {
+			return fiber.NewError(fiber.StatusBadRequest, "Kullanıcı adı yalnızca harf, rakam, _ ve - içerebilir (3-50 karakter).")
+		}
 		updates["username"] = req.Username
+	}
+
+	if len(updates) == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "en az bir alan gereklidir")
 	}
 
 	if err := h.DB.Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
@@ -156,6 +163,9 @@ func (h *Handler) GetFollowing(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetOnlineUsers(c *fiber.Ctx) error {
+	if h.RDB == nil {
+		return c.JSON([]string{})
+	}
 	// Returns users who have an active WS connection (members of the online sorted set)
 	members, err := h.RDB.ZRange(context.Background(), "online:users", 0, -1).Result()
 	if err != nil {

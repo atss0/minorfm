@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
+import { showError } from '@/lib/toast'
 import type { Comment } from '@/types'
 
 export function useComments(postId: string) {
@@ -23,6 +24,7 @@ export function useCreateComment(postId: string) {
       qc.invalidateQueries({ queryKey: ['comments', postId] })
       qc.invalidateQueries({ queryKey: ['posts'] })
     },
+    onError: () => showError('Yorum gönderilemedi. Lütfen tekrar deneyin.'),
   })
 }
 
@@ -33,7 +35,10 @@ export function useDeleteComment(postId: string) {
       api.delete(`/api/posts/${postId}/comments/${commentId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['comments', postId] })
+      // Feed'deki comment_count sayacını da güncelle
+      qc.invalidateQueries({ queryKey: ['posts-feed'] })
     },
+    onError: () => showError('Yorum silinemedi. Lütfen tekrar deneyin.'),
   })
 }
 

@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { API_BASE } from '@/lib/config'
 
 const adminApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -14,9 +15,20 @@ adminApi.interceptors.request.use((config) => {
         if (token) config.headers.Authorization = `Bearer ${token}`
       } catch {}
     }
+    // CSRF token for state-mutating requests — read from the csrf_ cookie set by the backend
+    const method = config.method?.toUpperCase()
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method ?? '')) {
+      const csrf = document.cookie.match(/(?:^|; )csrf_=([^;]*)/)?.[1]
+        ?? document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content
+      if (csrf) config.headers['X-CSRF-Token'] = csrf
+    }
   }
   return config
 })
+
+// Global kilit: admin için eş zamanlı 401 yanıtlarının her biri ayrı refresh
+// denemesi başlatmasını önler.
+let adminRefreshPromise: Promise<string | null> | null = null
 
 adminApi.interceptors.response.use(
   (res) => res,
@@ -24,25 +36,38 @@ adminApi.interceptors.response.use(
     const original = error.config
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
-      try {
-        const { useAdminAuthStore } = await import('@/store/adminAuthStore')
-        const { refreshToken, setAccessToken, logout } = useAdminAuthStore.getState()
-        if (!refreshToken) {
-          logout()
-          if (typeof window !== 'undefined') window.location.href = '/admin/login'
-          return Promise.reject(error)
-        }
-        const { data } = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/refresh`,
-          { refresh_token: refreshToken }
-        )
-        setAccessToken(data.access_token)
-        original.headers.Authorization = `Bearer ${data.access_token}`
+
+      if (!adminRefreshPromise) {
+        adminRefreshPromise = (async () => {
+          try {
+            const { useAdminAuthStore } = await import('@/store/adminAuthStore')
+            const { refreshToken, setAccessToken, logout } = useAdminAuthStore.getState()
+            if (!refreshToken) {
+              logout()
+              if (typeof window !== 'undefined') window.location.href = '/admin/login'
+              return null
+            }
+            const { data } = await axios.post(
+              `${API_BASE}/api/auth/refresh`,
+              { refresh_token: refreshToken }
+            )
+            setAccessToken(data.access_token)
+            return data.access_token as string
+          } catch {
+            const { useAdminAuthStore } = await import('@/store/adminAuthStore')
+            useAdminAuthStore.getState().logout()
+            if (typeof window !== 'undefined') window.location.href = '/admin/login'
+            return null
+          } finally {
+            adminRefreshPromise = null
+          }
+        })()
+      }
+
+      const newToken = await adminRefreshPromise
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`
         return adminApi(original)
-      } catch {
-        const { useAdminAuthStore } = await import('@/store/adminAuthStore')
-        useAdminAuthStore.getState().logout()
-        if (typeof window !== 'undefined') window.location.href = '/admin/login'
       }
     }
     return Promise.reject(error)

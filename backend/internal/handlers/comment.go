@@ -11,6 +11,15 @@ import (
 
 func (h *Handler) GetComments(c *fiber.Ctx) error {
 	postID := c.Params("id")
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 50)
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+
+	var total int64
+	h.DB.Model(&models.Comment{}).Where("post_id = ? AND parent_id IS NULL", postID).Count(&total)
 
 	var comments []models.Comment
 	h.DB.
@@ -18,9 +27,16 @@ func (h *Handler) GetComments(c *fiber.Ctx) error {
 		Preload("Replies.User").
 		Where("post_id = ? AND parent_id IS NULL", postID).
 		Order("created_at asc").
+		Limit(limit).
+		Offset(offset).
 		Find(&comments)
 
-	return c.JSON(comments)
+	return c.JSON(fiber.Map{
+		"data":  comments,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 func (h *Handler) CreateComment(c *fiber.Ctx) error {
@@ -37,6 +53,9 @@ func (h *Handler) CreateComment(c *fiber.Ctx) error {
 	}
 	if req.Body == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "body is required")
+	}
+	if len(req.Body) > 5000 {
+		return fiber.NewError(fiber.StatusBadRequest, "Yorum en fazla 5000 karakter olabilir.")
 	}
 
 	uid, _ := uuid.Parse(userID)
@@ -59,13 +78,19 @@ func (h *Handler) CreateComment(c *fiber.Ctx) error {
 		comment.ParentID = &parentUUID
 	}
 
-	if err := h.DB.Create(&comment).Error; err != nil {
+	// Create comment and update comment_count atomically
+	if err := h.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&comment).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.Post{}).
+			Where("id = ?", pid).
+			UpdateColumn("comment_count", gorm.Expr("comment_count + 1")).Error
+	}); err != nil {
 		return err
 	}
 
-	h.DB.Model(&models.Post{}).Where("id = ?", pid).UpdateColumn("comment_count", gorm.Expr("comment_count + 1"))
 	h.DB.Preload("User").First(&comment, "id = ?", comment.ID)
-
 	return c.Status(fiber.StatusCreated).JSON(comment)
 }
 

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/atss0/minorfm/internal/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -109,6 +111,32 @@ func (h *Handler) CreatePost(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "title and category_id are required")
 	}
 
+	// Validate post type against known values
+	validTypes := map[models.PostType]bool{
+		models.PostTypeArticle: true,
+		models.PostTypeLink:    true,
+		models.PostTypeEmbed:   true,
+		models.PostTypePoll:    true,
+		models.PostTypeGallery: true,
+		models.PostTypeVideo:   true,
+	}
+	if req.PostType != "" && !validTypes[req.PostType] {
+		return fiber.NewError(fiber.StatusBadRequest, "Geçersiz post tipi.")
+	}
+
+	// Validate metadata is a JSON object if provided
+	if len(req.Metadata) > 0 {
+		var metaCheck map[string]interface{}
+		if err := json.Unmarshal(req.Metadata, &metaCheck); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "metadata geçerli bir JSON objesi olmalıdır.")
+		}
+	}
+
+	// Sanitize body against stored XSS — UGCPolicy allows safe HTML tags only
+	if req.Body != "" {
+		req.Body = bluemonday.UGCPolicy().Sanitize(req.Body)
+	}
+
 	uid, _ := uuid.Parse(userID)
 	postType := req.PostType
 	if postType == "" {
@@ -130,7 +158,9 @@ func (h *Handler) CreatePost(c *fiber.Ctx) error {
 
 	h.DB.Preload("User").Preload("Category").First(&post, "id = ?", post.ID)
 
-	h.bustFeedCache(post.Category.Slug)
+	if err := h.bustFeedCache(post.Category.Slug); err != nil {
+		log.Printf("feed cache temizlenemedi (%s): %v", post.Category.Slug, err)
+	}
 
 	return c.Status(fiber.StatusCreated).JSON(post)
 }
@@ -188,7 +218,9 @@ func (h *Handler) DeletePost(c *fiber.Ctx) error {
 	var cat models.Category
 	h.DB.First(&cat, post.CategoryID)
 	h.DB.Delete(&post)
-	h.bustFeedCache(cat.Slug)
+	if err := h.bustFeedCache(cat.Slug); err != nil {
+		log.Printf("feed cache temizlenemedi (%s): %v", cat.Slug, err)
+	}
 
 	return c.SendStatus(fiber.StatusNoContent)
 }

@@ -20,13 +20,18 @@ export default function PostActions({ post }: { post: Post }) {
   const handleLike = async () => {
     if (!user) return
     const prev = liked
+    const prevCount = likeCount
     setLiked(!prev)
     setLikeCount((c) => (prev ? c - 1 : c + 1))
     try {
-      await likeMutation.mutateAsync(post.id)
+      const result = await likeMutation.mutateAsync(post.id)
+      // Sunucudan dönen gerçek sayıyı kullan; optimistik değerle sapma olmasın
+      if (result?.data?.like_count !== undefined) {
+        setLikeCount(result.data.like_count)
+      }
     } catch {
       setLiked(prev)
-      setLikeCount((c) => (prev ? c + 1 : c - 1))
+      setLikeCount(prevCount)
     }
   }
 
@@ -46,7 +51,7 @@ export default function PostActions({ post }: { post: Post }) {
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), 3000)
     } catch {}
   }
 

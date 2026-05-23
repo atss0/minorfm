@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/atss0/minorfm/internal/models"
 	"github.com/gofiber/fiber/v2"
 )
@@ -16,7 +18,8 @@ func (h *Handler) Search(c *fiber.Ctx) error {
 		limit = 50
 	}
 
-	pattern := "%" + q + "%"
+	escaped := strings.NewReplacer("%", "\\%", "_", "\\_").Replace(q)
+	pattern := "%" + escaped + "%"
 
 	var posts []models.Post
 	h.DB.Preload("User").Preload("Category").

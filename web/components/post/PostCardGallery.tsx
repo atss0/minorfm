@@ -55,7 +55,6 @@ export default function PostCardGallery({ post }: { post: Post }) {
                     // 600px'de sınırlar ve object-contain ile tamamını gösterir.
                     // Kalan sağ-sol boşluklar div'in bg-surface rengiyle feed'e karışır.
                     className="w-auto h-auto h-full max-h-[600px] object-contain group-hover:opacity-90 transition-opacity rounded-lg"
-                    unoptimized
                   />
                 ) : (
                   /* ÇOKLU FOTOĞRAF MANTIĞI: Grid'i doldurmak için fill ve object-cover */
@@ -64,7 +63,6 @@ export default function PostCardGallery({ post }: { post: Post }) {
                     alt={`${post.title} — ${i + 1}`}
                     fill
                     className="object-cover group-hover:opacity-90 transition-opacity rounded-lg"
-                    unoptimized
                   />
                 )}
 

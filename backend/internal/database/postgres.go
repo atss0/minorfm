@@ -36,6 +36,21 @@ func NewPostgres(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	// Ensure performance-critical indexes that GORM doesn't create automatically.
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)",
+		"CREATE INDEX IF NOT EXISTS idx_posts_category_id ON posts(category_id)",
+		"CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id)",
+		"CREATE INDEX IF NOT EXISTS idx_chat_messages_room_id ON chat_messages(room_id)",
+		"CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)",
+	}
+	for _, idx := range indexes {
+		if err := db.Exec(idx).Error; err != nil {
+			return nil, err
+		}
+	}
+
 	seedCategories(db)
 
 	return db, nil

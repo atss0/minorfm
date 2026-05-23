@@ -15,9 +15,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -29,7 +31,15 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+
 	cfg := config.Load()
+
+	if cfg.JWTSecret == "dev-secret-key-change-in-production" {
+		log.Fatal("CRITICAL: JWT_SECRET ortam değişkeni tanımlanmamış. Uygulama durduruluyor.")
+	}
 
 	db, err := database.NewPostgres(cfg.DatabaseURL)
 	if err != nil {
@@ -42,6 +52,10 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
+		BodyLimit:    10 * 1024 * 1024, // 10 MB
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
@@ -53,9 +67,19 @@ func main() {
 
 	app.Use(recover.New())
 	app.Use(logger.New())
+
+	// Security headers
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Set("Content-Security-Policy", "default-src 'none'")
+		return c.Next()
+	})
+
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.AllowedOrigins,
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-CSRF-Token",
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
 

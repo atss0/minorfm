@@ -4,14 +4,7 @@ import { useEffect, useRef } from 'react'
 import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
-
-function getBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-}
-
-function getWsBase(): string {
-  return getBase().replace(/^http/, 'ws')
-}
+import { API_BASE, WS_BASE } from '@/lib/config'
 
 function isExpired(token: string): boolean {
   try {
@@ -22,6 +15,9 @@ function isExpired(token: string): boolean {
   }
 }
 
+// Notifications cap retries to preserve battery/resources on mobile. After 8
+// attempts (~30 s total with exponential back-off) the user is expected to
+// refresh. Radio uses Infinity instead — see useRadio.ts for the reasoning.
 const MAX_RETRIES = 8
 
 export function useNotifications() {
@@ -46,7 +42,7 @@ export function useNotifications() {
       if (isExpired(token)) {
         if (!refreshToken) { logout(); return }
         try {
-          const { data } = await axios.post(`${getBase()}/api/auth/refresh`, { refresh_token: refreshToken })
+          const { data } = await axios.post(`${API_BASE}/api/auth/refresh`, { refresh_token: refreshToken })
           setAccessToken(data.access_token)
           // [accessToken] dep change causes this effect to re-run with the fresh token
         } catch {
@@ -56,7 +52,7 @@ export function useNotifications() {
       }
 
       const ws = new WebSocket(
-        `${getWsBase()}/ws/notifications?token=${encodeURIComponent(token)}`,
+        `${WS_BASE}/ws/notifications?token=${encodeURIComponent(token)}`,
       )
       wsRef.current = ws
 

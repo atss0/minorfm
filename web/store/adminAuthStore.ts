@@ -2,12 +2,14 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 
-// 24-hour admin session — shorter than the main site's 7-day session
+// Shorter than the main site's 7-day session — admin sessions expire sooner for safety.
+const ADMIN_COOKIE_MAX_AGE = 60 * 60 * 24 // 24 hours in seconds
+
 function setAdminCookie(role?: string) {
   if (typeof document === 'undefined') return
-  document.cookie = 'admin_logged_in=1; path=/; max-age=86400; SameSite=Lax'
+  document.cookie = `admin_logged_in=1; path=/; max-age=${ADMIN_COOKIE_MAX_AGE}; SameSite=Lax`
   if (role) {
-    document.cookie = `admin_role=${role}; path=/; max-age=86400; SameSite=Lax`
+    document.cookie = `admin_role=${role}; path=/; max-age=${ADMIN_COOKIE_MAX_AGE}; SameSite=Lax`
   }
 }
 

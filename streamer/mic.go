@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/binary"
 	"io"
 	"log"
@@ -16,17 +15,22 @@ import (
 )
 
 var wsUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		return origin == "" || origin == "http://"+r.Host || origin == "https://"+r.Host
+	},
 }
 
 // ── PCM Mixer ────────────────────────────────────────────────────────────────
 
 const (
-	mixRate     = 44100
-	mixCh       = 2
-	mixInterval = 20 * time.Millisecond
+	mixRate      = 44100
+	mixCh        = 2
+	mixInterval  = 20 * time.Millisecond
 	// bytes for one 20 ms chunk: 44100 * 2ch * 4 bytes(f32) * 0.02s
-	mixChunk = int(float64(mixRate*mixCh*4) * 0.02)
+	mixChunk     = int(float64(mixRate*mixCh*4) * 0.02)
+	maxMicBuf    = mixChunk * 50 // ~1 second of audio per input
+	maxMicInputs = 5             // max concurrent mic connections
 )
 
 type micInput struct {
@@ -36,7 +40,9 @@ type micInput struct {
 
 func (m *micInput) write(p []byte) {
 	m.mu.Lock()
-	m.buf = append(m.buf, p...)
+	if len(m.buf) < maxMicBuf {
+		m.buf = append(m.buf, p...)
+	}
 	m.mu.Unlock()
 }
 
@@ -65,29 +71,40 @@ type micMixer struct {
 
 var mx = &micMixer{inputs: make(map[string]*micInput)}
 
-func (m *micMixer) add(id string) *micInput {
+func (m *micMixer) add(id string) (*micInput, bool) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	if len(m.inputs) >= maxMicInputs {
+		m.mu.Unlock()
+		return nil, false
+	}
 	inp := &micInput{}
 	m.inputs[id] = inp
-	if len(m.inputs) == 1 {
+	start := len(m.inputs) == 1
+	if start {
 		m.startLocked()
 	}
-	return inp
+	m.mu.Unlock()
+	if start {
+		bc.StartMic()
+	}
+	return inp, true
 }
 
 func (m *micMixer) remove(id string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	delete(m.inputs, id)
-	if len(m.inputs) == 0 {
+	stop := len(m.inputs) == 0
+	if stop {
 		m.stopLocked()
+	}
+	m.mu.Unlock()
+	if stop {
+		bc.StopMic()
 	}
 }
 
 func (m *micMixer) startLocked() {
 	ctx, cancel := context.WithCancel(context.Background())
-	m.cancel = cancel
 
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-nostdin",
@@ -96,11 +113,26 @@ func (m *micMixer) startLocked() {
 		"-b:a", "128k", "-f", "mp3", "-loglevel", "error",
 		"pipe:1",
 	)
-	encIn, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
+	encIn, err := cmd.StdinPipe()
+	if err != nil {
+		log.Printf("mixer stdin pipe: %v", err)
+		cancel()
+		return
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Printf("mixer stdout pipe: %v", err)
+		cancel()
+		return
+	}
 	cmd.Stderr = io.Discard
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		log.Printf("mixer ffmpeg başlatılamadı (ffmpeg kurulu mu?): %v", err)
+		cancel()
+		return
+	}
 
+	m.cancel = cancel
 	m.encIn = encIn
 	m.encCmd = cmd
 
@@ -119,11 +151,11 @@ func (m *micMixer) startLocked() {
 		}
 	}()
 
-	m.done = make(chan struct{})
+	done := make(chan struct{})
+	m.done = done
 	m.ticker = time.NewTicker(mixInterval)
-	go m.loop()
+	go m.loop(done, m.ticker.C, encIn)
 
-	bc.StartMic()
 	log.Printf("🎙 mixer started")
 }
 
@@ -137,20 +169,20 @@ func (m *micMixer) stopLocked() {
 	m.ticker = nil
 	m.encIn = nil
 	m.encCmd = nil
-	bc.StopMic()
 	log.Printf("🎙 mixer stopped")
 }
 
-func (m *micMixer) loop() {
+func (m *micMixer) loop(done <-chan struct{}, tick <-chan time.Time, encIn io.WriteCloser) {
 	nSamples := mixChunk / 4
 	for {
 		select {
-		case <-m.done:
+		case <-done:
 			return
-		case <-m.ticker.C:
+		case <-tick:
 			mixed := make([]float32, nSamples)
 
 			m.mu.Lock()
+			count := float32(len(m.inputs))
 			for _, inp := range m.inputs {
 				raw := inp.drain(mixChunk)
 				for i := 0; i+3 < len(raw); i += 4 {
@@ -159,6 +191,12 @@ func (m *micMixer) loop() {
 				}
 			}
 			m.mu.Unlock()
+
+			if count > 1 {
+				for i := range mixed {
+					mixed[i] /= count
+				}
+			}
 
 			out := make([]byte, mixChunk)
 			for i, v := range mixed {
@@ -169,7 +207,7 @@ func (m *micMixer) loop() {
 				}
 				binary.LittleEndian.PutUint32(out[i*4:], math.Float32bits(v))
 			}
-			m.encIn.Write(out)
+			encIn.Write(out)
 		}
 	}
 }
@@ -178,9 +216,8 @@ func (m *micMixer) loop() {
 
 func handleMicWS(w http.ResponseWriter, r *http.Request) {
 	if adminPass != "" {
-		token := r.URL.Query().Get("token")
-		expected := base64.StdEncoding.EncodeToString([]byte(adminUser + ":" + adminPass))
-		if token != expected {
+		cookie, err := r.Cookie("session")
+		if err != nil || cookie.Value != sessionToken() {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -197,7 +234,12 @@ func handleMicWS(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	id := newID()
-	inp := mx.add(id)
+	inp, ok := mx.add(id)
+	if !ok {
+		conn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "too many concurrent mic connections"))
+		return
+	}
 	defer mx.remove(id)
 	log.Printf("🎙 mic %s joined", id)
 	defer log.Printf("🎙 mic %s left", id)
@@ -210,8 +252,16 @@ func handleMicWS(w http.ResponseWriter, r *http.Request) {
 		"-loglevel", "error",
 		"pipe:1",
 	)
-	decIn, _ := dec.StdinPipe()
-	decOut, _ := dec.StdoutPipe()
+	decIn, err := dec.StdinPipe()
+	if err != nil {
+		log.Printf("mic decoder stdin pipe: %v", err)
+		return
+	}
+	decOut, err := dec.StdoutPipe()
+	if err != nil {
+		log.Printf("mic decoder stdout pipe: %v", err)
+		return
+	}
 	dec.Stderr = io.Discard
 	if err := dec.Start(); err != nil {
 		log.Printf("mic decoder start: %v", err)

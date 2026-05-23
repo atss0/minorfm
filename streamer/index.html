@@ -491,11 +491,8 @@
 <footer id="statusBar">Idle</footer>
 
 <script>
-  const AUTH = '__AUTH_TOKEN__' ? 'Basic __AUTH_TOKEN__' : '';
-
   function apiFetch(url, opts = {}) {
-    if (AUTH) opts.headers = { 'Authorization': AUTH, ...(opts.headers || {}) };
-    return fetch(url, opts);
+    return fetch(url, { credentials: 'same-origin', ...opts });
   }
 
   let queue = [];
@@ -503,10 +500,11 @@
 
   // ── SSE ───────────────────────────────────────────────────────────────────
 
+  let sseRetry = 1000;
   function connectSSE() {
     const es = new EventSource('/events');
-    es.onmessage = () => { fetchStatus(); fetchQueue(); };
-    es.onerror   = () => { setTimeout(connectSSE, 3000); es.close(); };
+    es.onmessage = () => { sseRetry = 1000; fetchStatus(); fetchQueue(); };
+    es.onerror   = () => { es.close(); setTimeout(connectSSE, Math.min(sseRetry *= 2, 30000)); };
   }
   connectSSE();
 
@@ -535,14 +533,18 @@
       const n = s.listeners || 0;
       count.textContent = n === 1 ? '1 listener' : `${n} listeners`;
       setLoopUI(!!s.loop);
-    } catch (_) {}
+    } catch (_) {
+      document.getElementById('statusBar').textContent = 'Connection lost — retrying…';
+    }
   }
 
   async function fetchQueue() {
     try {
       queue = await apiFetch('/api/queue').then(r => r.json()) || [];
       renderQueue();
-    } catch (_) {}
+    } catch (_) {
+      // status bar error already shown by fetchStatus
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -607,11 +609,14 @@
     dragSrcIdx = null;
     renderQueue(); // optimistic
 
-    await apiFetch('/api/queue/reorder', {
+    const r = await apiFetch('/api/queue/reorder', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(queue.map(t => t.id)),
     });
+    if (!r.ok) {
+      fetchQueue(); // revert to server order on error
+    }
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -621,8 +626,15 @@
     const src = inp.value.trim();
     if (!src) return;
 
+    let parsedURL;
+    try { parsedURL = new URL(src); } catch { alert('Invalid URL'); return; }
+    if (parsedURL.protocol !== 'http:' && parsedURL.protocol !== 'https:') {
+      alert('Only http:// and https:// URLs are accepted');
+      return;
+    }
+
     const title = (() => {
-      try { return decodeURIComponent(new URL(src).pathname.split('/').pop() || src); }
+      try { return decodeURIComponent(parsedURL.pathname.split('/').pop() || src); }
       catch { return src; }
     })();
 
@@ -632,7 +644,10 @@
       body: JSON.stringify({ source: src, title }),
     });
     if (r.ok) { inp.value = ''; }
-    else { alert('Failed to add URL — check the server logs'); }
+    else {
+      const msg = await r.text().catch(() => '');
+      alert('Failed to add URL: ' + (msg || 'check the server logs'));
+    }
   }
 
   async function uploadFile(input) {
@@ -724,9 +739,8 @@
       setMicStatus('Mikrofon izni gerekli', true); return;
     }
 
-    const token = AUTH ? AUTH.slice(6) : '';
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    micWS = new WebSocket(`${proto}://${location.host}/api/mic?token=${encodeURIComponent(token)}`);
+    micWS = new WebSocket(`${proto}://${location.host}/api/mic`);
     micWS.binaryType = 'arraybuffer';
 
     micWS.onopen = () => {

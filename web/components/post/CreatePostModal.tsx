@@ -75,6 +75,7 @@ function CropModal({
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [cropError, setCropError] = useState<string | null>(null)
 
   const onCropComplete = useCallback((_: Area, croppedPixels: Area) => {
     setCroppedAreaPixels(croppedPixels)
@@ -83,11 +84,13 @@ function CropModal({
   const handleConfirm = async () => {
     if (!croppedAreaPixels) return
     setProcessing(true)
+    setCropError(null)
     try {
       const croppedFile = await getCroppedImg(imageSrc, croppedAreaPixels)
       onCropDone(croppedFile)
     } catch (e) {
       console.error(e)
+      setCropError('Görsel kırpılamadı. Lütfen tekrar deneyin.')
     } finally {
       setProcessing(false)
     }
@@ -106,21 +109,26 @@ function CropModal({
           onCropComplete={onCropComplete}
         />
       </div>
-      <div className="p-4 bg-surface border-t border-border flex gap-3">
-        <button
-          onClick={onCancel}
-          disabled={processing}
-          className="flex-1 py-3 rounded-xl bg-border text-white font-medium hover:bg-border/80 transition"
-        >
-          İptal
-        </button>
-        <button
-          onClick={handleConfirm}
-          disabled={processing}
-          className="flex-1 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition"
-        >
-          {processing ? 'İşleniyor...' : 'Kırp ve Ekle'}
-        </button>
+      <div className="p-4 bg-surface border-t border-border flex flex-col gap-3">
+        {cropError && (
+          <p className="text-xs text-primary text-center">{cropError}</p>
+        )}
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={processing}
+            className="flex-1 py-3 rounded-xl bg-border text-white font-medium hover:bg-border/80 transition"
+          >
+            İptal
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={processing}
+            className="flex-1 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition"
+          >
+            {processing ? 'İşleniyor...' : 'Kırp ve Ekle'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -267,11 +275,15 @@ function CoverArticleForm({ categoryId, postType, onSuccess }: FormProps) {
       const form = new FormData()
       form.append('file', file)
       const res = await api.post('/api/media/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' } // <--- ÇÖZÜM BURADA
+        headers: { 'Content-Type': 'multipart/form-data' }
       })
       setCoverUrl(res.data.url)
-    } catch {
-      setError('Görsel yüklenemedi')
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      if (status === 413) setError('Dosya çok büyük. Maksimum 10 MB yükleyebilirsiniz.')
+      else if (status === 400) setError('Desteklenmeyen dosya formatı.')
+      else if (status === 429) setError('Çok fazla istek. Lütfen bekleyin.')
+      else setError('Görsel yüklenemedi. Lütfen tekrar deneyin.')
     } finally {
       setUploading(false)
     }
@@ -316,7 +328,7 @@ function CoverArticleForm({ categoryId, postType, onSuccess }: FormProps) {
         <div>
           {coverUrl ? (
             <div className="relative aspect-[16/9] rounded-lg overflow-hidden bg-border group">
-              <Image src={coverUrl} alt="Kapak" fill className="object-cover" unoptimized />
+              <Image src={coverUrl} alt="Kapak" fill className="object-cover" />
               <button
                 type="button"
                 onClick={() => setCoverUrl('')}
@@ -401,7 +413,7 @@ function EmbedForm({ categoryId, postType, onSuccess, placeholder }: FormProps) 
       </div>
       {thumbnail && (
         <div className="relative aspect-video rounded-lg overflow-hidden bg-border">
-          <Image src={thumbnail} alt="Önizleme" fill className="object-cover" unoptimized />
+          <Image src={thumbnail} alt="Önizleme" fill className="object-cover" />
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center">
               <span className="text-white text-2xl ml-0.5">▶</span>
@@ -449,9 +461,12 @@ function GalleryForm({ categoryId, postType, onSuccess }: FormProps) {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       setImages((prev) => [...prev, res.data.url])
-    } catch (err: any) {
-      console.error("Yükleme Hatası:", err.response?.data || err.message || err);
-      setError('Görsel yüklenemedi')
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      if (status === 413) setError('Dosya çok büyük. Maksimum 10 MB yükleyebilirsiniz.')
+      else if (status === 400) setError('Desteklenmeyen dosya formatı.')
+      else if (status === 429) setError('Çok fazla istek. Lütfen bekleyin.')
+      else setError('Görsel yüklenemedi. Lütfen tekrar deneyin.')
     } finally {
       setUploading(false)
     }
@@ -499,7 +514,7 @@ function GalleryForm({ categoryId, postType, onSuccess }: FormProps) {
         <div className="grid grid-cols-3 gap-2">
           {images.map((src, i) => (
             <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-border group">
-              <Image src={src} alt={`Görsel ${i + 1}`} fill className="object-cover" unoptimized />
+              <Image src={src} alt={`Görsel ${i + 1}`} fill className="object-cover" />
               <button
                 type="button"
                 onClick={() => removeImage(i)}

@@ -8,9 +8,18 @@ import AdminTopBar from './AdminTopBar'
 
 const ALLOWED_ROLES = ['admin', 'moderator']
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' && payload.exp < Date.now() / 1000
+  } catch {
+    return true
+  }
+}
+
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const { user } = useAdminAuthStore()
+  const { user, accessToken } = useAdminAuthStore()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -18,10 +27,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }, [])
 
   useEffect(() => {
-    if (mounted && user !== null && !ALLOWED_ROLES.includes(user.role)) {
+    if (!mounted) return
+    // No user or wrong role → login
+    if (!user || !ALLOWED_ROLES.includes(user.role)) {
+      router.replace('/admin/login')
+      return
+    }
+    // Token expired → redirect immediately instead of waiting for a 401
+    if (!accessToken || isTokenExpired(accessToken)) {
       router.replace('/admin/login')
     }
-  }, [mounted, user, router])
+  }, [mounted, user, accessToken, router])
 
   if (!mounted) {
     return (
@@ -31,7 +47,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     )
   }
 
-  if (!user || !ALLOWED_ROLES.includes(user.role)) return null
+  if (!user || !ALLOWED_ROLES.includes(user.role) || !accessToken || isTokenExpired(accessToken)) return null
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">

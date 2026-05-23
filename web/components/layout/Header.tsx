@@ -17,11 +17,12 @@ import {
 import { usePlayerStore } from '@/store/playerStore'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
+import { globalLogout } from '@/store/globalLogout'
 import api from '@/lib/api'
 
 export default function Header() {
   const { volume, setVolume } = usePlayerStore()
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const { toggleSidebar, toggleChat, notificationCount } = useUIStore()
   const router = useRouter()
 
@@ -41,7 +42,7 @@ export default function Header() {
   const handleLogout = async () => {
     setShowUserMenu(false)
     try { await api.post('/api/auth/logout') } catch {}
-    logout()
+    globalLogout()
     router.push('/login')
   }
 
@@ -125,7 +126,6 @@ export default function Header() {
                     width={28}
                     height={28}
                     className="object-cover"
-                    unoptimized
                   />
                 ) : (
                   <User size={14} className="text-muted" />

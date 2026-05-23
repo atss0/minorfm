@@ -2,22 +2,29 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	_ "embed"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
-	adminUser = envOr("STREAMER_USER", "admin")
-	adminPass = envOr("STREAMER_PASS", "")
+	adminUser     = envOr("STREAMER_USER", "admin")
+	adminPass     = envOr("STREAMER_PASS", "")
+	elevenLabsKey = os.Getenv("ELEVENLABS_API_KEY")
 )
+
+var elClient = &http.Client{Timeout: 30 * time.Second}
 
 func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -26,9 +33,19 @@ func envOr(key, def string) string {
 	return def
 }
 
+func sessionToken() string {
+	mac := hmac.New(sha256.New, []byte(adminPass))
+	mac.Write([]byte(adminUser))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if adminPass == "" {
+			next(w, r)
+			return
+		}
+		if cookie, err := r.Cookie("session"); err == nil && cookie.Value == sessionToken() {
 			next(w, r)
 			return
 		}
@@ -56,11 +73,15 @@ var (
 )
 
 func main() {
+	if adminPass == "" {
+		log.Println("WARNING: STREAMER_PASS is not set — admin panel is open to everyone!")
+	}
+
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		log.Fatalf("cannot create uploads dir: %v", err)
 	}
 
-	q = &Queue{}
+	q = LoadQueue()
 	bc = NewBroadcaster(q)
 	go bc.Run()
 
@@ -81,6 +102,7 @@ func main() {
 	addr := ":7000"
 	log.Printf("admin  → http://localhost%s", addr)
 	log.Printf("stream → http://localhost%s/stream", addr)
+	log.Println("NOTE: serving over plain HTTP — use a reverse proxy with TLS in production")
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
@@ -91,13 +113,17 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if adminPass == "" {
-		w.Write(indexPage)
-		return
+	if adminPass != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    sessionToken(),
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+			Path:     "/",
+		})
 	}
-	token := base64.StdEncoding.EncodeToString([]byte(adminUser + ":" + adminPass))
-	w.Write(bytes.ReplaceAll(indexPage, []byte("__AUTH_TOKEN__"), []byte(token)))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(indexPage)
 }
 
 // ── Stream ───────────────────────────────────────────────────────────────────
@@ -203,10 +229,19 @@ func handleQueue(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "source required", http.StatusBadRequest)
 			return
 		}
+		u, err := url.Parse(body.Source)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			http.Error(w, "only http/https URLs are accepted", http.StatusBadRequest)
+			return
+		}
 		if body.Title == "" {
 			body.Title = body.Source
 		}
-		t := q.Add(Track{Title: body.Title, Source: body.Source})
+		t, err := q.Add(Track{Title: body.Title, Source: body.Source})
+		if err != nil {
+			http.Error(w, "queue is full", http.StatusTooManyRequests)
+			return
+		}
 		bc.notify()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -229,6 +264,11 @@ func handleQueueItem(w http.ResponseWriter, r *http.Request) {
 	}
 	removed, ok := q.Remove(id)
 	if !ok {
+		if cur := bc.Current(); cur != nil && cur.ID == id {
+			bc.Skip()
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
@@ -329,13 +369,22 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	if _, err := io.Copy(f, file); err != nil {
-		os.Remove(dest)
+		f.Close()
+		if rerr := os.Remove(dest); rerr != nil && !os.IsNotExist(rerr) {
+			log.Printf("cleanup after upload write error: %v", rerr)
+		}
 		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
 	}
 
 	title := strings.TrimSuffix(header.Filename, filepath.Ext(header.Filename))
-	t := q.Add(Track{ID: id, Title: title, Source: dest, IsFile: true})
+	t, err := q.Add(Track{ID: id, Title: title, Source: dest, IsFile: true})
+	if err != nil {
+		f.Close()
+		os.Remove(dest)
+		http.Error(w, "queue is full", http.StatusTooManyRequests)
+		return
+	}
 	bc.notify()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -361,8 +410,12 @@ func handleTTS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "text required", http.StatusBadRequest)
 		return
 	}
-	if body.APIKey == "" {
-		http.Error(w, "api_key required", http.StatusBadRequest)
+	key := elevenLabsKey
+	if key == "" {
+		key = body.APIKey
+	}
+	if key == "" {
+		http.Error(w, "api_key required (set ELEVENLABS_API_KEY env var or pass in body)", http.StatusBadRequest)
 		return
 	}
 	if body.VoiceID == "" {
@@ -387,11 +440,11 @@ func handleTTS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	req.Header.Set("xi-api-key", body.APIKey)
+	req.Header.Set("xi-api-key", key)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "audio/mpeg")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := elClient.Do(req)
 	if err != nil {
 		http.Error(w, "elevenlabs unreachable", http.StatusBadGateway)
 		return
@@ -414,7 +467,10 @@ func handleTTS(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		os.Remove(dest)
+		f.Close()
+		if rerr := os.Remove(dest); rerr != nil && !os.IsNotExist(rerr) {
+			log.Printf("cleanup after TTS write error: %v", rerr)
+		}
 		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
 	}
@@ -423,7 +479,13 @@ func handleTTS(w http.ResponseWriter, r *http.Request) {
 	if len([]rune(label)) > 60 {
 		label = string([]rune(label)[:60]) + "…"
 	}
-	t := q.Add(Track{ID: id, Title: "TTS: " + label, Source: dest, IsFile: true})
+	t, err := q.Add(Track{ID: id, Title: "TTS: " + label, Source: dest, IsFile: true})
+	if err != nil {
+		f.Close()
+		os.Remove(dest)
+		http.Error(w, "queue is full", http.StatusTooManyRequests)
+		return
+	}
 	bc.notify()
 
 	w.Header().Set("Content-Type", "application/json")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/atss0/minorfm/internal/models"
@@ -20,6 +21,19 @@ func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
 	var req body
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.ErrBadRequest
+	}
+
+	// Rate limit: max 3 reset requests per email per 15 minutes
+	if h.RDB != nil {
+		ctx := context.Background()
+		ratKey := fmt.Sprintf("reset_rate:%s", req.Email)
+		count, _ := h.RDB.Incr(ctx, ratKey).Result()
+		if count == 1 {
+			h.RDB.Expire(ctx, ratKey, 15*time.Minute)
+		}
+		if count > 3 {
+			return fiber.NewError(fiber.StatusTooManyRequests, "Çok fazla istek. 15 dakika sonra tekrar deneyin.")
+		}
 	}
 
 	var user models.User

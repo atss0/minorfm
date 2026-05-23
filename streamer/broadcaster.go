@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"io"
 	"log"
+	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -113,6 +114,11 @@ func (b *Broadcaster) StopMic() {
 	b.mu.Lock()
 	b.micActive = false
 	b.mu.Unlock()
+	// Drain any skip signal queued while mic was active so it doesn't skip the next track
+	select {
+	case <-b.skip:
+	default:
+	}
 	b.notify()
 }
 
@@ -149,12 +155,19 @@ func (b *Broadcaster) Run() {
 		log.Printf("▶ playing: %s", track.Title)
 		b.streamTrack(track)
 		log.Printf("✓ finished: %s", track.Title)
+		if track.IsFile {
+			if err := os.Remove(track.Source); err != nil && !os.IsNotExist(err) {
+				log.Printf("temp file remove failed: %v", err)
+			}
+		}
 
 		b.mu.RLock()
 		looping := b.loop
 		b.mu.RUnlock()
 		if looping {
-			b.queue.Add(*track)
+			if _, err := b.queue.Prepend(*track); err != nil {
+				log.Printf("loop prepend: %v", err)
+			}
 			b.notify()
 		}
 	}
@@ -185,7 +198,8 @@ func (b *Broadcaster) streamTrack(track *Track) {
 		"-loglevel", "error",
 		"pipe:1",
 	)
-	cmd.Stderr = io.Discard
+	var ffmpegStderr strings.Builder
+	cmd.Stderr = &ffmpegStderr
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -209,7 +223,11 @@ func (b *Broadcaster) streamTrack(track *Track) {
 			break
 		}
 	}
-	cmd.Wait()
+	if err := cmd.Wait(); err != nil {
+		if msg := strings.TrimSpace(ffmpegStderr.String()); msg != "" {
+			log.Printf("ffmpeg [%s]: %s", track.Title, msg)
+		}
+	}
 }
 
 // SSE notifications for queue/status changes

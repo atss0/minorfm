@@ -19,6 +19,9 @@ interface PollData {
   options: PollOption[]
 }
 
+// Polls are low-churn data; 1-minute freshness is acceptable.
+const POLL_STALE_MS = 60_000
+
 export default function PostCardPoll({ post }: { post: Post }) {
   const { user } = useAuthStore()
   const [votedId, setVotedId] = useState<string | null>(null)
@@ -30,7 +33,7 @@ export default function PostCardPoll({ post }: { post: Post }) {
       api
         .get(`/api/posts/${post.id}/poll`, { validateStatus: (s) => s < 500 })
         .then((r) => (r.status === 404 ? null : (r.data as PollData))),
-    staleTime: 60_000,
+    staleTime: POLL_STALE_MS,
     retry: false,
   })
 

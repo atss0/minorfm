@@ -43,7 +43,6 @@ function GalleryLightbox({ images, initial, onClose }: { images: string[]; initi
           width={900}
           height={600}
           className="object-contain max-h-[85vh] rounded-lg"
-          unoptimized
         />
         <p className="text-center text-white/50 text-sm mt-2">{idx + 1} / {images.length}</p>
       </div>
@@ -108,7 +107,6 @@ export default function PostDetailView({ postId }: Props) {
               width={900}
               height={600}
               className="w-auto h-auto max-h-[500px] object-contain"
-              unoptimized
             />
           </div>
         ) : null}
@@ -124,7 +122,6 @@ export default function PostDetailView({ postId }: Props) {
                   width={32}
                   height={32}
                   className="rounded-full object-cover"
-                  unoptimized
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-border flex items-center justify-center text-xs font-bold text-muted">
@@ -189,7 +186,6 @@ export default function PostDetailView({ postId }: Props) {
                     alt={`${post.title} — ${i + 1}`}
                     fill
                     className="object-cover"
-                    unoptimized
                   />
                 </button>
               ))}

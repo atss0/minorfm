@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Camera, User, Lock, Bell, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { globalLogout } from '@/store/globalLogout'
 import api from '@/lib/api'
 
 // --- Profile form ---
@@ -70,7 +71,7 @@ function AvatarSection() {
       <div className="flex items-center gap-5">
         <div className="relative w-20 h-20 rounded-full overflow-hidden bg-border shrink-0">
           {user?.avatar_url ? (
-            <Image src={user.avatar_url} alt={user.username} fill className="object-contain" unoptimized />
+            <Image src={user.avatar_url} alt={user.username} fill className="object-contain" />
           ) : (
             <div className="flex items-center justify-center h-full">
               <User size={28} className="text-muted" />
@@ -278,7 +279,6 @@ function NotificationsSection() {
 }
 
 function DangerZone() {
-  const { logout } = useAuthStore()
   const [confirm, setConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -287,7 +287,7 @@ function DangerZone() {
     setDeleting(true)
     try {
       await api.delete('/api/users/me')
-      logout()
+      globalLogout()
     } catch {
       setDeleting(false)
       setConfirm(false)

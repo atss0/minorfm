@@ -4,16 +4,9 @@ import { useEffect, useRef } from 'react'
 import axios from 'axios'
 import { useChatStore } from '@/store/chatStore'
 import { useAuthStore } from '@/store/authStore'
+import { API_BASE, WS_BASE } from '@/lib/config'
 import api from '@/lib/api'
 import type { ChatMessage } from '@/types'
-
-function getBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-}
-
-function getWsBase(): string {
-  return getBase().replace(/^http/, 'ws')
-}
 
 function isExpired(token: string): boolean {
   try {
@@ -24,6 +17,9 @@ function isExpired(token: string): boolean {
   }
 }
 
+// Chat caps retries to preserve battery/resources on mobile. After 8 attempts
+// (~30 s total with exponential back-off) the user is expected to refresh.
+// Radio uses Infinity instead — see useRadio.ts for the reasoning.
 const MAX_RETRIES = 8
 
 export function useChat(roomId: string) {
@@ -74,7 +70,7 @@ export function useChat(roomId: string) {
       if (isExpired(token)) {
         if (!refreshToken) { logout(); return }
         try {
-          const { data } = await axios.post(`${getBase()}/api/auth/refresh`, { refresh_token: refreshToken })
+          const { data } = await axios.post(`${API_BASE}/api/auth/refresh`, { refresh_token: refreshToken })
           setAccessToken(data.access_token)
           // [accessToken] dep change causes this effect to re-run with the fresh token
         } catch {
@@ -84,7 +80,7 @@ export function useChat(roomId: string) {
       }
 
       const ws = new WebSocket(
-        `${getWsBase()}/ws/chat/${roomId}?token=${encodeURIComponent(token)}`,
+        `${WS_BASE}/ws/chat/${roomId}?token=${encodeURIComponent(token)}`,
       )
       wsRef.current = ws
 

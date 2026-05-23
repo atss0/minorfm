@@ -111,7 +111,6 @@ export default function LeftSidebar() {
                           width={24}
                           height={24}
                           className="object-cover"
-                          unoptimized
                         />
                       ) : (
                         <User size={12} className="text-muted" />

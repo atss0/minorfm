@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '@/store/playerStore'
+import { WS_BASE } from '@/lib/config'
 import api from '@/lib/api'
 import type { Track } from '@/types'
 
@@ -9,12 +10,6 @@ interface RadioState {
   track: Track | null
   started_at: string
   is_playing: boolean
-}
-
-function getWsBase(): string {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-  // WS endpoint is at root (not under /api), so strip the /api suffix
-  return apiUrl.replace(/\/api\/?$/, '').replace(/^http/, 'ws')
 }
 
 function applyState(state: RadioState, store: ReturnType<typeof usePlayerStore.getState>) {
@@ -34,6 +29,12 @@ function applyState(state: RadioState, store: ReturnType<typeof usePlayerStore.g
   else store.pause()
 }
 
+// Radio WebSocket retries indefinitely — it is the app's primary feature and
+// must always attempt to reconnect. Chat/Notifications cap at MAX_RETRIES = 8
+// to preserve battery on mobile; radio does not have that constraint because
+// the user explicitly chose to listen and expects continuous playback.
+const MAX_RETRIES = Infinity
+
 export function useRadio() {
   const mountedRef = useRef(true)
   const wsRef = useRef<WebSocket | null>(null)
@@ -42,6 +43,7 @@ export function useRadio() {
 
   useEffect(() => {
     mountedRef.current = true
+    attemptsRef.current = 0
 
     // Fetch initial state via REST as fast fallback before WS connects
     api
@@ -53,9 +55,14 @@ export function useRadio() {
       .catch(() => {})
 
     function connect() {
-      if (!mountedRef.current) return
-      const ws = new WebSocket(`${getWsBase()}/ws/radio`)
+      if (!mountedRef.current || attemptsRef.current > MAX_RETRIES) return
+      const ws = new WebSocket(`${WS_BASE}/ws/radio`)
       wsRef.current = ws
+
+      ws.onopen = () => {
+        if (!mountedRef.current) { ws.close(); return }
+        attemptsRef.current = 0
+      }
 
       ws.onmessage = (event) => {
         try {
@@ -65,7 +72,7 @@ export function useRadio() {
 
       ws.onclose = () => {
         if (!mountedRef.current) return
-        const delay = Math.min(1000 * Math.pow(2, attemptsRef.current), 30000)
+        const delay = Math.min(1000 * Math.pow(2, attemptsRef.current), 30_000)
         attemptsRef.current++
         retryRef.current = setTimeout(connect, delay)
       }

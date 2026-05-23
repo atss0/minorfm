@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
+import { globalLogout } from '@/store/globalLogout'
 
 function isExpired(token: string): boolean {
   try {
@@ -19,31 +20,45 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const { accessToken, refreshToken, setAccessToken, logout } = useAuthStore.getState()
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
 
     async function validate() {
-      if (accessToken && !isExpired(accessToken)) {
-        setReady(true)
-        return
-      }
+      const { accessToken, refreshToken, setAccessToken } = useAuthStore.getState()
+      try {
+        if (accessToken && !isExpired(accessToken)) {
+          setReady(true)
+          return
+        }
 
-      if (refreshToken) {
-        try {
+        if (refreshToken) {
           const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-          const { data } = await axios.post(`${base}/api/auth/refresh`, {
-            refresh_token: refreshToken,
-          })
+          const { data } = await axios.post(
+            `${base}/api/auth/refresh`,
+            { refresh_token: refreshToken },
+            { signal: controller.signal }
+          )
           setAccessToken(data.access_token)
           setReady(true)
           return
-        } catch {}
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Session validation failed:', error.message)
+        }
+      } finally {
+        clearTimeout(timeout)
       }
 
-      logout()
+      globalLogout()
       router.replace('/login')
     }
 
     validate()
+    return () => {
+      controller.abort()
+      clearTimeout(timeout)
+    }
   }, [router])
 
   if (!ready) return null

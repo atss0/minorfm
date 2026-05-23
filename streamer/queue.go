@@ -2,9 +2,17 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
+	"os"
 	"sync"
 )
+
+const maxQueueSize = 200
+
+var errQueueFull = errors.New("queue full")
 
 type Track struct {
 	ID     string `json:"id"`
@@ -18,20 +26,63 @@ type Queue struct {
 	tracks []Track
 }
 
+const queueFile = "./queue.json"
+
 func newID() string {
 	b := make([]byte, 8)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("crypto/rand failed: %v", err)
+	}
 	return fmt.Sprintf("%x", b)
 }
 
-func (q *Queue) Add(t Track) Track {
+func (q *Queue) save() {
+	q.mu.RLock()
+	data, _ := json.Marshal(q.tracks)
+	q.mu.RUnlock()
+	os.WriteFile(queueFile, data, 0o644)
+}
+
+func LoadQueue() *Queue {
+	q := &Queue{}
+	data, err := os.ReadFile(queueFile)
+	if err != nil {
+		return q
+	}
+	if err := json.Unmarshal(data, &q.tracks); err != nil {
+		log.Printf("queue.json parse error: %v", err)
+	}
+	return q
+}
+
+func (q *Queue) Add(t Track) (Track, error) {
 	if t.ID == "" {
 		t.ID = newID()
 	}
 	q.mu.Lock()
+	if len(q.tracks) >= maxQueueSize {
+		q.mu.Unlock()
+		return Track{}, errQueueFull
+	}
 	q.tracks = append(q.tracks, t)
 	q.mu.Unlock()
-	return t
+	go q.save()
+	return t, nil
+}
+
+func (q *Queue) Prepend(t Track) (Track, error) {
+	if t.ID == "" {
+		t.ID = newID()
+	}
+	q.mu.Lock()
+	if len(q.tracks) >= maxQueueSize {
+		q.mu.Unlock()
+		return Track{}, errQueueFull
+	}
+	q.tracks = append([]Track{t}, q.tracks...)
+	q.mu.Unlock()
+	go q.save()
+	return t, nil
 }
 
 func (q *Queue) Remove(id string) (Track, bool) {
@@ -40,6 +91,7 @@ func (q *Queue) Remove(id string) (Track, bool) {
 	for i, t := range q.tracks {
 		if t.ID == id {
 			q.tracks = append(q.tracks[:i], q.tracks[i+1:]...)
+			go q.save()
 			return t, true
 		}
 	}
@@ -65,6 +117,7 @@ func (q *Queue) Reorder(ids []string) bool {
 		next = append(next, t)
 	}
 	q.tracks = next
+	go q.save()
 	return true
 }
 
@@ -76,6 +129,7 @@ func (q *Queue) Pop() *Track {
 	}
 	t := q.tracks[0]
 	q.tracks = q.tracks[1:]
+	go q.save()
 	return &t
 }
 

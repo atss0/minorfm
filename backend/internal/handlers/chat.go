@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/atss0/minorfm/internal/models"
 	"github.com/atss0/minorfm/internal/ws"
@@ -12,20 +14,36 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// WSAuth is a Fiber middleware that validates a JWT from the ?token= query param.
-// It runs before the WebSocket upgrade and sets userID in Locals.
+// WSAuth is a Fiber middleware that validates a JWT before the WebSocket upgrade.
+// Token is read from (in order): access_token cookie, Authorization header, ?token= query param.
 func (h *Handler) WSAuth(c *fiber.Ctx) error {
 	if !wsconn.IsWebSocketUpgrade(c) {
 		return fiber.ErrUpgradeRequired
 	}
 
-	tokenStr := c.Query("token")
+	// Prefer cookie > Authorization header > query param (least secure)
+	tokenStr := c.Cookies("access_token")
+	if tokenStr == "" {
+		auth := c.Get("Authorization")
+		tokenStr = strings.TrimPrefix(auth, "Bearer ")
+	}
+	if tokenStr == "" {
+		tokenStr = c.Query("token")
+	}
 	if tokenStr == "" {
 		return fiber.NewError(fiber.StatusUnauthorized, "missing token")
 	}
 
-	if h.RDB.Exists(context.Background(), fmt.Sprintf("blacklist:%s", tokenStr)).Val() > 0 {
-		return fiber.NewError(fiber.StatusUnauthorized, "token has been revoked")
+	if h.RDB != nil {
+		ctx := context.Background()
+		// New: Sorted Set blacklist
+		if score, err := h.RDB.ZScore(ctx, "token_blacklist", tokenStr).Result(); err == nil && score > float64(time.Now().Unix()) {
+			return fiber.NewError(fiber.StatusUnauthorized, "token has been revoked")
+		}
+		// Backward compat: old per-key blacklist
+		if h.RDB.Exists(ctx, fmt.Sprintf("blacklist:%s", tokenStr)).Val() > 0 {
+			return fiber.NewError(fiber.StatusUnauthorized, "token has been revoked")
+		}
 	}
 
 	claims := &jwt.MapClaims{}

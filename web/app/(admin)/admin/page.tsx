@@ -36,10 +36,19 @@ function Skeleton() {
 export default function AdminDashboardPage() {
   const [period, setPeriod] = useState<7 | 30>(7)
 
-  const { data, isLoading } = useQuery<StatsResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<StatsResponse>({
     queryKey: ['admin-stats'],
     queryFn: () => api.get('/api/admin/stats').then(r => r.data),
   })
+
+  if (isError) return (
+    <div className="text-center py-20">
+      <p className="text-muted">İstatistikler yüklenemedi.</p>
+      <button onClick={() => refetch()} className="mt-4 text-primary underline text-sm">
+        Tekrar Dene
+      </button>
+    </div>
+  )
 
   if (isLoading || !data) return <Skeleton />
 
@@ -101,7 +110,6 @@ export default function AdminDashboardPage() {
                     width={28}
                     height={28}
                     className="rounded-full object-cover shrink-0"
-                    unoptimized
                   />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-border flex items-center justify-center text-xs font-bold text-white shrink-0">

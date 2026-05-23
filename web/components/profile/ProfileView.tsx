@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
+import { globalLogout } from '@/store/globalLogout'
 import FeedView from '@/components/feed/FeedView'
 import type { User } from '@/types'
 
@@ -14,7 +15,7 @@ interface Props {
 
 export default function ProfileView({ username }: Props) {
   // Zustand store'undan user bilgisini ve (eğer yazdıysan) logout fonksiyonunu alıyoruz
-  const { user: me, logout: clearClientAuth } = useAuthStore() as any 
+  const { user: me } = useAuthStore()
   const qc = useQueryClient()
   const router = useRouter()
 
@@ -37,11 +38,8 @@ export default function ProfileView({ username }: Props) {
   const logoutMutation = useMutation({
     mutationFn: () => api.post('/api/auth/logout'), // Kendi endpoint'ine göre yolu uyarla
     onSuccess: () => {
-      // 1. İstemci tarafındaki kullanıcı state'ini temizle
-      if (clearClientAuth) clearClientAuth() 
-      // 2. Başka kullanıcının verisi kalmasın diye React Query önbelleğini temizle
-      qc.clear() 
-      // 3. Login sayfasına yönlendir
+      globalLogout()
+      qc.clear()
       router.push('/login')
     },
   })
@@ -82,7 +80,6 @@ export default function ProfileView({ username }: Props) {
                 width={64}
                 height={64}
                 className="object-cover"
-                unoptimized
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-muted">

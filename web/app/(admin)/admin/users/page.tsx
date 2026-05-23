@@ -50,9 +50,18 @@ export default function AdminUsersPage() {
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/users/${id}`),
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
       setDeleteTarget(null)
-      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      // Mevcut sayfanın cache'inden kaydı çıkar — invalidate yerine setQueryData
+      // kullanılması sayfayı 1'e sıfırlamaz, kullanıcı bulunduğu sayfada kalır.
+      qc.setQueryData<UsersResponse>(['admin-users', q, role, page], (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          data: old.data.filter((u) => u.id !== deletedId),
+          total: old.total - 1,
+        }
+      })
     },
   })
 
@@ -138,7 +147,6 @@ export default function AdminUsersPage() {
                             width={28}
                             height={28}
                             className="rounded-full object-cover shrink-0"
-                            unoptimized
                           />
                         ) : (
                           <div className="w-7 h-7 rounded-full bg-border flex items-center justify-center text-xs font-bold text-white shrink-0">

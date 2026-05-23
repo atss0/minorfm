@@ -2,6 +2,11 @@
 
 import { QueryClient, QueryClientProvider, HydrationBoundary, type DehydratedState } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Toaster } from 'sonner'
+
+// Global TanStack Query default: 1 minute stale time, 1 retry on failure.
+// Individual hooks override these where tighter freshness is required.
+const QUERY_STALE_MS = 60_000
 
 export default function Providers({
   children,
@@ -14,7 +19,7 @@ export default function Providers({
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 60_000, retry: 1 },
+          queries: { staleTime: QUERY_STALE_MS, retry: 1 },
         },
       })
   )
@@ -24,6 +29,7 @@ export default function Providers({
       <HydrationBoundary state={dehydratedState}>
         {children}
       </HydrationBoundary>
+      <Toaster theme="dark" position="bottom-right" richColors />
     </QueryClientProvider>
   )
 }

@@ -3,14 +3,18 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/atss0/minorfm/internal/models"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{3,50}$`)
 
 type registerRequest struct {
 	Username   string `json:"username"`
@@ -32,6 +36,10 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 	if req.Username == "" || req.Email == "" || len(req.Password) < 8 {
 		return fiber.NewError(fiber.StatusBadRequest, "username, email and password (min 8 chars) are required")
 	}
+	if !usernameRegex.MatchString(req.Username) {
+		return fiber.NewError(fiber.StatusBadRequest, "Kullanıcı adı yalnızca harf, rakam, _ ve - içerebilir (3-50 karakter).")
+	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	// Invite code is mandatory
 	code := strings.ToUpper(strings.TrimSpace(req.InviteCode))
@@ -74,14 +82,44 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.ErrBadRequest
 	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
-	var user models.User
-	if err := h.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
+	// Account-level rate limiting: block after 10 consecutive failures per email
+	if h.RDB != nil {
+		ctx := context.Background()
+		failKey := fmt.Sprintf("login_fail:%s", req.Email)
+		fails, _ := h.RDB.Get(ctx, failKey).Int()
+		if fails >= 10 {
+			return fiber.NewError(fiber.StatusTooManyRequests, "Çok fazla başarısız deneme. 15 dakika sonra tekrar deneyin.")
+		}
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
+	var user models.User
+	authErr := func() error {
+		if err := h.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+			return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+			return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
+		}
+		return nil
+	}()
+
+	if authErr != nil {
+		if h.RDB != nil {
+			ctx := context.Background()
+			failKey := fmt.Sprintf("login_fail:%s", req.Email)
+			count, _ := h.RDB.Incr(ctx, failKey).Result()
+			if count == 1 {
+				h.RDB.Expire(ctx, failKey, 15*time.Minute)
+			}
+		}
+		return authErr
+	}
+
+	// Reset failure counter on successful login
+	if h.RDB != nil {
+		h.RDB.Del(context.Background(), fmt.Sprintf("login_fail:%s", req.Email))
 	}
 
 	accessToken, err := h.generateAccessToken(user)
@@ -124,15 +162,17 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 	}
 
 	userID, _ := (*claims)["sub"].(string)
-	key := fmt.Sprintf("refresh:%s", userID)
-	stored, err := h.RDB.Get(context.Background(), key).Result()
-	if err != nil || stored != req.RefreshToken {
-		return fiber.NewError(fiber.StatusUnauthorized, "refresh token expired or invalid")
+	if h.RDB != nil {
+		key := fmt.Sprintf("refresh:%s", userID)
+		stored, err := h.RDB.Get(context.Background(), key).Result()
+		if err != nil || stored != req.RefreshToken {
+			return fiber.NewError(fiber.StatusUnauthorized, "refresh token expired or invalid")
+		}
 	}
 
 	var user models.User
 	if err := h.DB.First(&user, "id = ?", userID).Error; err != nil {
-		return fiber.NewError(fiber.StatusUnauthorized, "user not found")
+		return fiber.NewError(fiber.StatusUnauthorized, "invalid refresh token")
 	}
 
 	accessToken, err := h.generateAccessToken(user)
@@ -156,14 +196,19 @@ func (h *Handler) Logout(c *fiber.Ctx) error {
 	})
 
 	if h.RDB != nil {
+		ctx := context.Background()
 		if exp, ok := (*claims)["exp"].(float64); ok {
-			ttl := time.Until(time.Unix(int64(exp), 0))
-			if ttl > 0 {
-				h.RDB.Set(context.Background(), fmt.Sprintf("blacklist:%s", tokenStr), "1", ttl)
+			expireAt := time.Unix(int64(exp), 0)
+			if expireAt.After(time.Now()) {
+				// Sorted Set blacklist — score is the expiry Unix timestamp for easy cleanup
+				h.RDB.ZAdd(ctx, "token_blacklist", redis.Z{
+					Score:  float64(expireAt.Unix()),
+					Member: tokenStr,
+				})
 			}
 		}
 		if userID, ok := (*claims)["sub"].(string); ok {
-			h.RDB.Del(context.Background(), fmt.Sprintf("refresh:%s", userID))
+			h.RDB.Del(ctx, fmt.Sprintf("refresh:%s", userID))
 		}
 	}
 

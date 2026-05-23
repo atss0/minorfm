@@ -51,7 +51,7 @@ func setupPostApp(t *testing.T) (*fiber.App, *handlers.Handler) {
 		},
 	})
 
-	protected := middleware.JWTProtected(cfg, nil)
+	protected := middleware.JWTProtected(cfg, nil, db)
 	app.Get("/api/posts", h.GetPosts)
 	app.Get("/api/posts/:id", h.GetPost)
 	app.Post("/api/posts", protected, h.CreatePost)

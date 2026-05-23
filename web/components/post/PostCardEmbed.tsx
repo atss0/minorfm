@@ -68,7 +68,6 @@ export default function PostCardEmbed({ post }: { post: Post }) {
                 alt={post.title}
                 fill
                 className="object-cover group-hover:opacity-80 transition-opacity"
-                unoptimized
               />
             ) : (
               <div className="absolute inset-0 bg-surface flex items-center justify-center">
