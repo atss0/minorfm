@@ -156,6 +156,12 @@ func Setup(app *fiber.App, db *gorm.DB, rdb *redis.Client, cfg *config.Config) {
 	api.Post("/media/avatar", protected, h.UploadAvatar)
 	api.Post("/media/upload", protected, h.UploadMedia)
 
+	// recordings
+	recordings := api.Group("/recordings")
+	recordings.Get("/", h.GetRecordings)
+	recordings.Post("/", protected, h.CreateRecording)
+	recordings.Delete("/:id", protected, h.DeleteRecording)
+
 	// search
 	api.Get("/search", h.Search)
 

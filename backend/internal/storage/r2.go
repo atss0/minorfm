@@ -124,6 +124,41 @@ func (r *R2Store) UploadWithThumbnail(ctx context.Context, file multipart.File, 
 	}, nil
 }
 
+// UploadAudio stores an audio file and returns its public URL.
+func (r *R2Store) UploadAudio(ctx context.Context, file multipart.File, header *multipart.FileHeader, folder string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext == "" {
+		ext = ".m4a"
+	}
+	key := fmt.Sprintf("%s/%s%s", folder, uuid.New().String(), ext)
+
+	contentType := header.Header.Get("Content-Type")
+	switch {
+	case contentType != "" && contentType != "application/octet-stream":
+		// use as-is
+	case ext == ".mp3":
+		contentType = "audio/mpeg"
+	case ext == ".ogg":
+		contentType = "audio/ogg"
+	case ext == ".wav":
+		contentType = "audio/wav"
+	default:
+		contentType = "audio/mp4"
+	}
+
+	_, err := r.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(r.bucket),
+		Key:         aws.String(key),
+		Body:        file,
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return "", fmt.Errorf("r2 upload audio: %w", err)
+	}
+
+	return fmt.Sprintf("%s/%s", r.publicURL, key), nil
+}
+
 // Delete removes an object by its public URL (extracts the key).
 func (r *R2Store) Delete(ctx context.Context, publicURL string) error {
 	key := strings.TrimPrefix(publicURL, r.publicURL+"/")

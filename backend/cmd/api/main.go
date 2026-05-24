@@ -52,7 +52,7 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
-		BodyLimit:    10 * 1024 * 1024, // 10 MB
+		BodyLimit:    50 * 1024 * 1024, // 50 MB (audio uploads)
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,

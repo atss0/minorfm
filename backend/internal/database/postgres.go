@@ -32,6 +32,7 @@ func NewPostgres(dsn string) (*gorm.DB, error) {
 		&models.PollVote{},
 		&models.Invite{},
 		&models.Announcement{},
+		&models.Recording{},
 	); err != nil {
 		return nil, err
 	}
