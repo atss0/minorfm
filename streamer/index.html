@@ -1119,9 +1119,16 @@ async function toggleDesktopSource() {
 async function attachDesktopSource() {
   ensureAudioCtx();
   try {
-    desktopStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: false });
+    // video: true is required by spec — we stop the video track immediately after
+    desktopStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
   } catch (e) {
-    setDesktopSubLabel('İzin reddedildi veya desteklenmiyor', true);
+    if (e.name === 'NotAllowedError') {
+      setDesktopSubLabel('İzin reddedildi', true);
+    } else if (e.name === 'NotSupportedError') {
+      setDesktopSubLabel('Tarayıcı desteklemiyor (Chrome önerilir)', true);
+    } else {
+      setDesktopSubLabel('Desteklenmiyor veya hata: ' + e.name, true);
+    }
     return;
   }
 
