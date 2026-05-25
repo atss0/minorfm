@@ -155,20 +155,19 @@ func (b *Broadcaster) Run() {
 		log.Printf("▶ playing: %s", track.Title)
 		b.streamTrack(track)
 		log.Printf("✓ finished: %s", track.Title)
-		if track.IsFile {
-			if err := os.Remove(track.Source); err != nil && !os.IsNotExist(err) {
-				log.Printf("temp file remove failed: %v", err)
-			}
-		}
 
 		b.mu.RLock()
 		looping := b.loop
 		b.mu.RUnlock()
 		if looping {
-			if _, err := b.queue.Prepend(*track); err != nil {
-				log.Printf("loop prepend: %v", err)
+			if _, err := b.queue.Add(*track); err != nil {
+				log.Printf("loop add: %v", err)
 			}
 			b.notify()
+		} else if track.IsFile {
+			if err := os.Remove(track.Source); err != nil && !os.IsNotExist(err) {
+				log.Printf("temp file remove failed: %v", err)
+			}
 		}
 	}
 }

@@ -7,311 +7,543 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg:       #0B1114;
+      --surface:  #111A1F;
+      --surface2: #172028;
+      --border:   #1E2C33;
+      --border2:  #253540;
+      --text:     #E8F0F4;
+      --muted:    #6B8A99;
+      --dim:      #344D5A;
+      --primary:  #BC022D;
+      --primary-h: #D60233;
+      --green:    #22C55E;
+      --amber:    #F59E0B;
+      --red:      #EF4444;
+      --radius:   10px;
+    }
+
     body {
-      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      background: #080808;
-      color: #d0d0d0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
-    /* ── Header ── */
+    /* ── Header ─────────────────────────────────────────────────────────────── */
     header {
-      padding: 18px 28px;
-      border-bottom: 1px solid #161616;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
+      background: var(--surface);
     }
 
     .logo {
-      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
       font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #fff;
+      letter-spacing: -0.01em;
+      color: var(--text);
     }
-    .logo span { color: #888; font-weight: 400; }
+    .logo-sep { color: var(--dim); font-weight: 400; margin: 0 2px; }
+    .logo-sub { color: var(--muted); font-weight: 500; font-size: 13px; }
 
-    .badge {
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .live-badge {
       display: flex;
       align-items: center;
       gap: 7px;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
     }
-    .badge-dot {
-      width: 6px;
-      height: 6px;
+    .live-dot {
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
     }
-    .badge.live  { color: #ff3b3b; }
-    .badge.live  .badge-dot { background: #ff3b3b; animation: blink 1.4s ease-in-out infinite; }
-    .badge.idle  { color: #666; }
-    .badge.idle  .badge-dot { background: #666; }
+    .live-badge.on  { color: var(--primary); }
+    .live-badge.on  .live-dot { background: var(--primary); animation: pulse 1.4s ease-in-out infinite; }
+    .live-badge.off { color: var(--dim); }
+    .live-badge.off .live-dot { background: var(--dim); }
 
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .listener-badge {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .listener-badge svg { opacity: 0.6; }
 
-    /* ── Layout ── */
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.85)} }
+
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
     main {
       flex: 1;
-      padding: 28px;
-      max-width: 700px;
+      padding: 20px 24px;
+      max-width: 720px;
       width: 100%;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
 
-    /* ── Card ── */
+    /* ── Cards ──────────────────────────────────────────────────────────────── */
     .card {
-      background: #0f0f0f;
-      border: 1px solid #1c1c1c;
-      border-radius: 6px;
-      padding: 18px 20px;
-    }
-    .card-label {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: #777;
-      margin-bottom: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
     }
 
-    /* ── Now Playing ── */
-    .now-playing-title {
-      font-size: 17px;
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .card-body { padding: 18px; }
+
+    /* ── Now Playing ────────────────────────────────────────────────────────── */
+    .now-playing {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .np-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .np-icon svg { color: var(--muted); }
+    .np-info { flex: 1; min-width: 0; }
+    .np-title {
+      font-size: 15px;
       font-weight: 600;
-      color: #fff;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-bottom: 6px;
-      min-height: 24px;
+      min-height: 22px;
     }
-    .stream-info {
-      font-size: 11px;
-      color: #666;
-      margin-bottom: 16px;
-    }
-    .stream-info a { color: #999; text-decoration: none; }
-    .stream-info a:hover { color: #ccc; }
+    .np-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-    .controls {
+    .np-controls {
       display: flex;
       align-items: center;
       gap: 8px;
+      margin-top: 14px;
       flex-wrap: wrap;
     }
-    .listener-count {
-      margin-left: auto;
-      font-size: 11px;
-      color: #777;
-    }
 
-    /* ── Audio Player ── */
-    .player-wrap {
-      margin-top: 14px;
-      display: none;
-    }
-    audio {
-      width: 100%;
-      height: 28px;
-      accent-color: #fff;
-    }
-
-    /* ── Buttons ── */
+    /* ── Buttons ────────────────────────────────────────────────────────────── */
     button {
       cursor: pointer;
       border: none;
-      border-radius: 4px;
+      border-radius: 7px;
       font-family: inherit;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 600;
-      letter-spacing: 0.05em;
       line-height: 1;
-      transition: background 0.12s, color 0.12s, border-color 0.12s;
+      transition: background 0.12s, color 0.12s, border-color 0.12s, opacity 0.12s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
-    .btn {
-      padding: 7px 13px;
-      background: #181818;
-      color: #bbb;
-      border: 1px solid #2e2e2e;
-    }
-    .btn:hover { background: #222; color: #ddd; }
-    .btn:disabled { opacity: .4; cursor: default; }
+    button:disabled { opacity: 0.4; cursor: default; }
 
-    .btn-white {
-      padding: 7px 13px;
-      background: #e8e8e8;
-      color: #000;
+    .btn-ghost {
+      padding: 8px 14px;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border2);
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--border); color: var(--text); }
+    .btn-ghost.active { background: var(--border2); color: var(--text); border-color: var(--dim); }
+
+    .btn-primary {
+      padding: 8px 14px;
+      background: var(--primary);
+      color: #fff;
       border: 1px solid transparent;
     }
-    .btn-white:hover { background: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+
+    .btn-danger {
+      padding: 8px 14px;
+      background: rgba(239,68,68,.12);
+      color: var(--red);
+      border: 1px solid rgba(239,68,68,.2);
+    }
+    .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,.2); }
 
     .btn-icon {
-      padding: 5px 8px;
+      padding: 5px;
       background: transparent;
-      color: #777;
+      color: var(--dim);
       border: 1px solid transparent;
-      font-size: 15px;
+      border-radius: 5px;
+      font-size: 16px;
     }
-    .btn-icon:hover { color: #ff4444; background: rgba(255,68,68,.07); }
+    .btn-icon:hover:not(:disabled) { color: var(--red); background: rgba(239,68,68,.1); }
 
-    /* ── Add Form ── */
+    /* ── Broadcast / Live Section ───────────────────────────────────────────── */
+    .broadcast-master {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .broadcast-status-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .broadcast-status-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .broadcast-status-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-broadcast-start {
+      padding: 10px 20px;
+      background: var(--primary);
+      color: #fff;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+      min-width: 120px;
+    }
+    .btn-broadcast-start:hover:not(:disabled) { background: var(--primary-h); }
+    .btn-broadcast-start.live {
+      background: rgba(239,68,68,.12);
+      color: var(--red);
+      border-color: rgba(239,68,68,.25);
+    }
+    .btn-broadcast-start.live:hover:not(:disabled) { background: rgba(239,68,68,.2); }
+
+    /* ── Source Rows ────────────────────────────────────────────────────────── */
+    .source-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .source-row {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .source-row:last-child { border-bottom: none; }
+
+    .source-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .source-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .source-icon svg { color: var(--muted); }
+    .source-icon.active-icon svg { color: var(--primary); }
+    .source-icon.active-icon { background: rgba(188,2,45,.1); border-color: rgba(188,2,45,.25); }
+
+    .source-name {
+      flex: 1;
+      min-width: 0;
+    }
+    .source-name-label { font-size: 14px; font-weight: 600; color: var(--text); }
+    .source-name-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .source-toggle {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 7px;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border2);
+      flex-shrink: 0;
+      min-width: 80px;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+    .source-toggle:hover:not(:disabled) { background: var(--border); color: var(--text); }
+    .source-toggle.on {
+      background: rgba(188,2,45,.12);
+      color: var(--primary);
+      border-color: rgba(188,2,45,.3);
+    }
+    .source-toggle.on:hover:not(:disabled) { background: rgba(188,2,45,.2); }
+
+    .source-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Device select */
+    .device-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .device-row label { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 52px; }
+
+    select {
+      flex: 1;
+      min-width: 0;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 6px 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .12s;
+    }
+    select:focus { border-color: var(--dim); }
+    select option { background: #1a2530; }
+
+    /* Volume row */
+    .vol-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .vol-row label { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 52px; }
+    .vol-value { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 30px; text-align: right; }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text);
+      border: 2px solid var(--bg);
+      transition: transform .1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    input[type=range]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text);
+      border: 2px solid var(--bg);
+    }
+
+    /* VU Meter */
+    .vu-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .vu-row label { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 52px; }
+    .vu-meter {
+      flex: 1;
+      height: 6px;
+      background: var(--border2);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .vu-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--green) 0%, var(--amber) 75%, var(--red) 100%);
+      transition: width 0.04s linear;
+    }
+    .vu-peak {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 2px;
+      background: var(--text);
+      border-radius: 1px;
+      opacity: 0.5;
+      transition: left 0.1s ease-out, opacity 0.5s;
+    }
+
+    /* ── Source disabled state ───────────────────────────────────────────────── */
+    .source-row.disabled .source-controls { opacity: 0.4; pointer-events: none; }
+
+    /* ── Add to Queue ───────────────────────────────────────────────────────── */
     .add-row {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
-    input[type="text"] {
+
+    input[type=text] {
       flex: 1;
-      min-width: 0;
-      background: #0a0a0a;
-      border: 1px solid #1e1e1e;
-      border-radius: 4px;
-      color: #d0d0d0;
+      min-width: 180px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      color: var(--text);
       font-family: inherit;
-      font-size: 12px;
-      padding: 7px 11px;
+      font-size: 13px;
+      padding: 8px 12px;
       outline: none;
-      transition: border-color .15s;
+      transition: border-color .12s;
     }
-    input[type="text"]::placeholder { color: #555; }
-    input[type="text"]:focus { border-color: #555; }
-    input[type="file"] { display: none; }
+    input[type=text]::placeholder { color: var(--dim); }
+    input[type=text]:focus { border-color: var(--dim); }
+    input[type=file] { display: none; }
 
-    /* ── Queue List ── */
-    .queue-list {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      min-height: 44px;
-    }
-
-    .queue-empty {
-      font-size: 12px;
-      color: #666;
-      padding: 14px 10px;
-      text-align: center;
-    }
+    /* ── Queue ──────────────────────────────────────────────────────────────── */
+    .queue-list { display: flex; flex-direction: column; gap: 3px; }
+    .queue-empty { font-size: 13px; color: var(--dim); padding: 20px; text-align: center; }
 
     .queue-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 9px 10px;
-      background: #0a0a0a;
-      border: 1px solid #181818;
-      border-radius: 4px;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
       cursor: default;
       transition: background .1s, border-color .1s, opacity .15s;
       user-select: none;
     }
     .queue-item.dragging  { opacity: .3; }
-    .queue-item.drag-over { border-color: #383838; background: #131313; }
+    .queue-item.drag-over { border-color: var(--dim); background: #1c2c38; }
 
     .drag-handle {
-      color: #555;
+      color: var(--dim);
       cursor: grab;
-      font-size: 15px;
+      font-size: 16px;
       flex-shrink: 0;
       line-height: 1;
-      padding: 2px 3px;
+      padding: 2px;
     }
-    .drag-handle:hover { color: #aaa; }
+    .drag-handle:hover { color: var(--muted); }
     .drag-handle:active { cursor: grabbing; }
 
-    .track-num {
-      font-size: 10px;
-      color: #666;
-      width: 16px;
-      text-align: right;
-      flex-shrink: 0;
-    }
-
+    .track-num { font-size: 11px; color: var(--dim); width: 16px; text-align: right; flex-shrink: 0; }
     .track-title {
       flex: 1;
-      font-size: 12px;
-      color: #d0d0d0;
+      font-size: 13px;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-
     .track-tag {
-      font-size: 9px;
-      letter-spacing: .1em;
+      font-size: 10px;
+      letter-spacing: .08em;
       text-transform: uppercase;
-      color: #666;
+      color: var(--dim);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
       flex-shrink: 0;
     }
 
-    /* ── Loop button active state ── */
-    .btn.active {
-      background: #1e1e1e;
-      color: #fff;
-      border-color: #555;
-    }
-
-    /* ── TTS ── */
+    /* ── TTS ────────────────────────────────────────────────────────────────── */
     .tts-settings {
       display: flex;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       flex-wrap: wrap;
     }
-
-    .tts-settings input[type="password"] {
+    input[type=password] {
       flex: 1;
-      min-width: 160px;
-      background: #0a0a0a;
-      border: 1px solid #1e1e1e;
-      border-radius: 4px;
-      color: #d0d0d0;
+      min-width: 140px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      color: var(--text);
       font-family: inherit;
-      font-size: 12px;
-      padding: 7px 11px;
+      font-size: 13px;
+      padding: 8px 12px;
       outline: none;
-      transition: border-color .15s;
+      transition: border-color .12s;
     }
-    .tts-settings input[type="password"]:focus { border-color: #555; }
-    .tts-settings input[type="password"]::placeholder { color: #555; }
-
-    select {
-      background: #0a0a0a;
-      border: 1px solid #1e1e1e;
-      border-radius: 4px;
-      color: #d0d0d0;
-      font-family: inherit;
-      font-size: 12px;
-      padding: 7px 10px;
-      outline: none;
-      cursor: pointer;
-    }
-    select:focus { border-color: #555; }
+    input[type=password]::placeholder { color: var(--dim); }
+    input[type=password]:focus { border-color: var(--dim); }
 
     textarea {
       width: 100%;
-      background: #0a0a0a;
-      border: 1px solid #1e1e1e;
-      border-radius: 4px;
-      color: #d0d0d0;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      color: var(--text);
       font-family: inherit;
-      font-size: 13px;
+      font-size: 14px;
       line-height: 1.6;
-      padding: 10px 11px;
+      padding: 10px 12px;
       outline: none;
       resize: vertical;
-      transition: border-color .15s;
+      transition: border-color .12s;
     }
-    textarea:focus { border-color: #555; }
-    textarea::placeholder { color: #555; }
+    textarea:focus { border-color: var(--dim); }
+    textarea::placeholder { color: var(--dim); }
 
     .tts-footer {
       display: flex;
@@ -319,31 +551,47 @@
       justify-content: space-between;
       margin-top: 10px;
       gap: 8px;
+      flex-wrap: wrap;
     }
-    .tts-hint {
-      font-size: 11px;
-      color: #666;
-    }
-    .tts-hint.error { color: #ff5555; }
-    .tts-hint.ok    { color: #55cc77; }
+    .tts-hint { font-size: 12px; color: var(--muted); }
+    .tts-hint.error { color: var(--red); }
+    .tts-hint.ok    { color: var(--green); }
 
-    /* ── Status bar ── */
+    /* ── Player ─────────────────────────────────────────────────────────────── */
+    .player-wrap { margin-top: 14px; display: none; }
+    audio { width: 100%; height: 28px; accent-color: var(--primary); }
+
+    /* ── Footer ─────────────────────────────────────────────────────────────── */
     footer {
-      padding: 10px 28px;
-      border-top: 1px solid #1a1a1a;
-      font-size: 10px;
-      color: #666;
-      letter-spacing: .04em;
+      padding: 10px 24px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--dim);
+      background: var(--surface);
     }
+
+    /* ── Utils ──────────────────────────────────────────────────────────────── */
+    .flex-gap { display: flex; align-items: center; gap: 8px; }
+    .ml-auto  { margin-left: auto; }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">MINOR.fm <span>/ streamer</span></div>
-  <div class="badge idle" id="liveBadge">
-    <div class="badge-dot"></div>
-    <span id="liveLabel">IDLE</span>
+  <div class="logo">
+    MINOR.fm
+    <span class="logo-sep">/</span>
+    <span class="logo-sub">streamer</span>
+  </div>
+  <div class="header-right">
+    <div class="listener-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span id="listenerCount">0</span>
+    </div>
+    <div class="live-badge off" id="liveBadge">
+      <div class="live-dot"></div>
+      <span id="liveLabel">IDLE</span>
+    </div>
   </div>
 </header>
 
@@ -351,505 +599,791 @@
 
   <!-- Now Playing -->
   <div class="card">
-    <div class="card-label">Now Playing</div>
-    <div class="now-playing-title" id="nowPlaying">—</div>
-    <div class="stream-info">
-      Stream URL: <a id="streamLink" href="/stream" target="_blank">/stream</a>
+    <div class="card-header">
+      <span class="card-title">Şu An Çalıyor</span>
+      <div class="flex-gap">
+        <button class="btn-ghost" id="loopBtn" onclick="toggleLoop()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          Loop
+        </button>
+        <button class="btn-ghost" onclick="skip()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+          Atla
+        </button>
+        <button class="btn-ghost" id="playerBtn" onclick="togglePlayer()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Dinle
+        </button>
+      </div>
     </div>
-    <div class="controls">
-      <button class="btn" onclick="skip()">⏭ Skip</button>
-      <button class="btn" id="loopBtn" onclick="toggleLoop()">↻ Loop: OFF</button>
-      <button class="btn" id="playerBtn" onclick="togglePlayer()">▶ Play in browser</button>
-      <span class="listener-count" id="listenerCount">0 listeners</span>
+    <div class="card-body">
+      <div class="now-playing">
+        <div class="np-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        </div>
+        <div class="np-info">
+          <div class="np-title" id="nowPlaying">—</div>
+          <div class="np-sub">
+            <a href="/stream" target="_blank" style="color:var(--muted);text-decoration:none">/stream</a>
+          </div>
+        </div>
+      </div>
+      <div class="player-wrap" id="playerWrap">
+        <audio id="player" controls preload="none">
+          <source src="/stream" type="audio/mpeg">
+        </audio>
+      </div>
     </div>
-    <div class="player-wrap" id="playerWrap">
-      <audio id="player" controls preload="none">
-        <source src="/stream" type="audio/mpeg">
-      </audio>
+  </div>
+
+  <!-- Canlı Yayın -->
+  <div class="card">
+    <div class="broadcast-master">
+      <div class="broadcast-status-text">
+        <div class="broadcast-status-label" id="broadcastLabel">Yayın kapalı</div>
+        <div class="broadcast-status-sub" id="broadcastSub">Kaynak seç ve yayını başlat</div>
+      </div>
+      <button class="btn-broadcast-start" id="broadcastBtn" onclick="toggleBroadcast()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+        Yayına Başla
+      </button>
+    </div>
+
+    <div class="source-list">
+
+      <!-- Mikrofon -->
+      <div class="source-row disabled" id="micRow">
+        <div class="source-top">
+          <div class="source-icon" id="micIcon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </div>
+          <div class="source-name">
+            <div class="source-name-label">Mikrofon</div>
+            <div class="source-name-sub" id="micSubLabel">Kapalı</div>
+          </div>
+          <button class="source-toggle" id="micToggle" onclick="toggleMicSource()">Ekle</button>
+        </div>
+        <div class="source-controls" id="micControls">
+          <div class="device-row">
+            <label>Cihaz</label>
+            <select id="micDeviceSelect" onchange="onMicDeviceChange()">
+              <option value="">Varsayılan mikrofon</option>
+            </select>
+          </div>
+          <div class="vol-row">
+            <label>Ses</label>
+            <input type="range" id="micVolume" min="0" max="200" value="100"
+              oninput="onMicVolumeChange(this.value)" step="1">
+            <span class="vol-value" id="micVolValue">100%</span>
+          </div>
+          <div class="vu-row">
+            <label>Seviye</label>
+            <div class="vu-meter">
+              <div class="vu-bar" id="micVuBar"></div>
+              <div class="vu-peak" id="micVuPeak"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Masaüstü Sesi -->
+      <div class="source-row disabled" id="desktopRow">
+        <div class="source-top">
+          <div class="source-icon" id="desktopIcon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div class="source-name">
+            <div class="source-name-label">Masaüstü Sesi</div>
+            <div class="source-name-sub" id="desktopSubLabel">Kapalı</div>
+          </div>
+          <button class="source-toggle" id="desktopToggle" onclick="toggleDesktopSource()">Ekle</button>
+        </div>
+        <div class="source-controls" id="desktopControls">
+          <div class="vol-row">
+            <label>Ses</label>
+            <input type="range" id="desktopVolume" min="0" max="200" value="100"
+              oninput="onDesktopVolumeChange(this.value)" step="1">
+            <span class="vol-value" id="desktopVolValue">100%</span>
+          </div>
+          <div class="vu-row">
+            <label>Seviye</label>
+            <div class="vu-meter">
+              <div class="vu-bar" id="desktopVuBar"></div>
+              <div class="vu-peak" id="desktopVuPeak"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- Add to Queue -->
   <div class="card">
-    <div class="card-label">Add to Queue</div>
-    <div class="add-row">
-      <input
-        type="text"
-        id="urlInput"
-        placeholder="https://example.com/audio.mp3  or any stream URL"
-        onkeydown="if(event.key==='Enter') addURL()"
-      >
-      <button class="btn-white" onclick="addURL()">Add URL</button>
-      <button class="btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()">Upload</button>
-      <input
-        type="file"
-        id="fileInput"
-        accept=".mp3,.wav,.flac,.ogg,.aac,.m4a,.opus"
-        onchange="uploadFile(this)"
-      >
+    <div class="card-header">
+      <span class="card-title">Kuyruk &nbsp;<span id="queueCount" style="color:var(--dim)">0</span></span>
+      <div class="flex-gap">
+        <button class="btn-ghost" id="uploadBtn" onclick="document.getElementById('fileInput').click()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Yükle
+        </button>
+        <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,.m4a,.opus" onchange="uploadFile(this)">
+      </div>
     </div>
-  </div>
-
-  <!-- Queue -->
-  <div class="card">
-    <div class="card-label">Queue &nbsp;<span id="queueCount" style="color:#777">0</span></div>
-    <div class="queue-list" id="queueList">
-      <div class="queue-empty">Queue is empty — add a URL or upload a file</div>
-    </div>
-  </div>
-
-  <!-- Live Mic -->
-  <div class="card">
-    <div class="card-label">Canlı Yayın</div>
-    <div class="controls">
-      <button class="btn" id="micBtn" onclick="toggleMic()">🎙 Başlat</button>
-      <span id="micStatus" style="font-size:11px;color:#666;">Mikrofon kapalı</span>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <div class="add-row">
+        <input type="text" id="urlInput" placeholder="https://example.com/audio.mp3"
+          onkeydown="if(event.key==='Enter') addURL()">
+        <button class="btn-primary" onclick="addURL()">URL Ekle</button>
+      </div>
+      <div class="queue-list" id="queueList">
+        <div class="queue-empty">Kuyruk boş — URL gir veya dosya yükle</div>
+      </div>
     </div>
   </div>
 
   <!-- ElevenLabs TTS -->
   <div class="card">
-    <div class="card-label">ElevenLabs TTS</div>
-
-    <div class="tts-settings">
-      <input
-        type="password"
-        id="elApiKey"
-        placeholder="ElevenLabs API Key"
-        oninput="localStorage.setItem('el_api_key', this.value)"
-      >
-      <select id="elVoice" onchange="localStorage.setItem('el_voice', this.value)">
-        <optgroup label="★ Türkçe için önerilen">
-          <option value="RXCCWbOxP7Hisa63Xsv5">Adam – Calm, Relaxing and Informative</option>
-          <option value="XB0fDUnXU5powFXDhCwa">Charlotte (Free)</option>
-          <option value="onwK4e9ZLuTAKqWW03F9">Daniel (Free)</option>
-          <option value="N2lVS1w4EtoT3dr4eOWO">Callum (Free)</option>
-          <option value="XrExE9yKIg1WjnnlVkGX">Matilda (Free)</option>
-        </optgroup>
-        <optgroup label="Kadın sesleri">
-          <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Free)</option>
-          <option value="EXAVITQu4vr4xnSDxMaL">Bella (Free)</option>
-          <option value="AZnzlk1XvdvUeBnXmlld">Domi (Free)</option>
-          <option value="MF3mGyEYCl7XYWbV9V6O">Elli (Free)</option>
-          <option value="LcfcDJNUP1GQjkzn1xUU">Emily (Free)</option>
-          <option value="jsCqWAovK2LkecY7zXl4">Freya (Free)</option>
-          <option value="jBpfuIE2acCO8z3wKNLl">Gigi (Free)</option>
-          <option value="z9fAnlkpzviPz146aGWa">Glinda (Free)</option>
-          <option value="oWAxZDx7w5VEj9dCyTzz">Grace (Free)</option>
-          <option value="bVMeCyTHy58xNoL34h3p">Jeremy (Free)</option>
-          <option value="pFZP5JQG7iQjIQuC4Bku">Lily (Free)</option>
-          <option value="zrHiDhphv9ZnVXBqCLjz">Mimi (Free)</option>
-          <option value="pMsXgVXv3BLzUgSXRplE">Serena (Free)</option>
-          <option value="ThT5KcBeYPX3keUQqHPh">Dorothy (Free)</option>
-        </optgroup>
-        <optgroup label="Erkek sesleri">
-          <option value="pNInz6obpgDQGcFmaJgB">Adam (Free)</option>
-          <option value="ErXwobaYiN019PkySvjV">Antoni (Free)</option>
-          <option value="VR6AewLTigWG4xSOukaG">Arnold (Free)</option>
-          <option value="IKne3meq5aSn9XLyUdCD">Charlie (Free)</option>
-          <option value="2EiwWnXFnvU5JabPnv8n">Clyde (Free)</option>
-          <option value="CYw3kZ02Hs0563khs1Fj">Dave (Free)</option>
-          <option value="29vD33N1wnOsEx8nV7UT">Drew (Free)</option>
-          <option value="g5CIjZEefAph4nQFvHAz">Ethan (Free)</option>
-          <option value="D38z5RcWu1voky8WS1ja">Fin (Free)</option>
-          <option value="zcAOhNBS3c14rBihAFp1">Giovanni (Free)</option>
-          <option value="SOYHLrjzK2X1ezoPC6cr">Harry (Free)</option>
-          <option value="ZQe5CZNOzWyzPSCn5a3c">James (Free)</option>
-          <option value="t0jbNlBVZ17f02VDIeMI">Jessie (Free)</option>
-          <option value="Zlb1dXrM653N07WRdFW3">Joseph (Free)</option>
-          <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Free)</option>
-          <option value="TX3LPaxmHKxFdv7VOQHJ">Liam (Free)</option>
-          <option value="Yko7PKHZNXotIFUBG7I9">Matthew (Free)</option>
-          <option value="flq6f7yl4xJhdPVyMApo">Michael (Free)</option>
-          <option value="ODq5zmih8GrVes37Dy39">Patrick (Free)</option>
-          <option value="5Q0t7uMcjvnagumLfvZi">Paul (Free)</option>
-          <option value="yoZ06aMxZJJ28mfd3POQ">Sam (Free)</option>
-          <option value="GBv7mTt0atIp3Br8iCZE">Thomas (Free)</option>
-        </optgroup>
-      </select>
-      <select id="elModel" onchange="localStorage.setItem('el_model', this.value)">
-        <option value="eleven_multilingual_v2">Multilingual v2</option>
-        <option value="eleven_monolingual_v1">English v1</option>
-        <option value="eleven_turbo_v2_5">Turbo v2.5 (fast)</option>
-      </select>
+    <div class="card-header">
+      <span class="card-title">ElevenLabs TTS</span>
     </div>
-
-    <textarea
-      id="ttsText"
-      placeholder="Sıraya eklenecek metni buraya yaz…"
-      rows="4"
-    ></textarea>
-
-    <div class="tts-footer">
-      <span class="tts-hint" id="ttsStatus">API key'ini gir ve metni yaz</span>
-      <button class="btn-white" id="ttsBtn" onclick="generateTTS()">Oluştur &amp; Sıraya Ekle</button>
+    <div class="card-body">
+      <div class="tts-settings">
+        <input type="password" id="elApiKey" placeholder="ElevenLabs API Key"
+          oninput="localStorage.setItem('el_api_key', this.value)">
+        <select id="elVoice" onchange="localStorage.setItem('el_voice', this.value)">
+          <optgroup label="★ Türkçe için önerilen">
+            <option value="RXCCWbOxP7Hisa63Xsv5">Adam – Calm</option>
+            <option value="XB0fDUnXU5powFXDhCwa">Charlotte</option>
+            <option value="onwK4e9ZLuTAKqWW03F9">Daniel</option>
+            <option value="N2lVS1w4EtoT3dr4eOWO">Callum</option>
+            <option value="XrExE9yKIg1WjnnlVkGX">Matilda</option>
+          </optgroup>
+          <optgroup label="Kadın sesleri">
+            <option value="21m00Tcm4TlvDq8ikWAM">Rachel</option>
+            <option value="EXAVITQu4vr4xnSDxMaL">Bella</option>
+            <option value="AZnzlk1XvdvUeBnXmlld">Domi</option>
+            <option value="MF3mGyEYCl7XYWbV9V6O">Elli</option>
+            <option value="LcfcDJNUP1GQjkzn1xUU">Emily</option>
+            <option value="jsCqWAovK2LkecY7zXl4">Freya</option>
+            <option value="pFZP5JQG7iQjIQuC4Bku">Lily</option>
+          </optgroup>
+          <optgroup label="Erkek sesleri">
+            <option value="pNInz6obpgDQGcFmaJgB">Adam</option>
+            <option value="ErXwobaYiN019PkySvjV">Antoni</option>
+            <option value="VR6AewLTigWG4xSOukaG">Arnold</option>
+            <option value="IKne3meq5aSn9XLyUdCD">Charlie</option>
+            <option value="2EiwWnXFnvU5JabPnv8n">Clyde</option>
+            <option value="29vD33N1wnOsEx8nV7UT">Drew</option>
+            <option value="g5CIjZEefAph4nQFvHAz">Ethan</option>
+            <option value="TX3LPaxmHKxFdv7VOQHJ">Josh</option>
+            <option value="TX3LPaxmHKxFdv7VOQHJ">Liam</option>
+            <option value="yoZ06aMxZJJ28mfd3POQ">Sam</option>
+          </optgroup>
+        </select>
+        <select id="elModel" onchange="localStorage.setItem('el_model', this.value)">
+          <option value="eleven_multilingual_v2">Multilingual v2</option>
+          <option value="eleven_monolingual_v1">English v1</option>
+          <option value="eleven_turbo_v2_5">Turbo v2.5</option>
+        </select>
+      </div>
+      <textarea id="ttsText" placeholder="Sıraya eklenecek metni buraya yaz…" rows="3"></textarea>
+      <div class="tts-footer">
+        <span class="tts-hint" id="ttsStatus">API key gir ve metni yaz</span>
+        <button class="btn-primary" id="ttsBtn" onclick="generateTTS()">Oluştur &amp; Sıraya Ekle</button>
+      </div>
     </div>
   </div>
 
 </main>
 
-<footer id="statusBar">Idle</footer>
+<footer id="statusBar">Hazır</footer>
 
 <script>
-  function apiFetch(url, opts = {}) {
-    return fetch(url, { credentials: 'same-origin', ...opts });
-  }
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-  let queue = [];
-  let dragSrcIdx = null;
+function apiFetch(url, opts = {}) {
+  return fetch(url, { credentials: 'same-origin', ...opts });
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-  // ── SSE ───────────────────────────────────────────────────────────────────
+// ── SSE ───────────────────────────────────────────────────────────────────────
 
-  let sseRetry = 1000;
-  function connectSSE() {
-    const es = new EventSource('/events');
-    es.onmessage = () => { sseRetry = 1000; fetchStatus(); fetchQueue(); };
-    es.onerror   = () => { es.close(); setTimeout(connectSSE, Math.min(sseRetry *= 2, 30000)); };
-  }
-  connectSSE();
+let sseRetry = 1000;
+function connectSSE() {
+  const es = new EventSource('/events');
+  es.onmessage = () => { sseRetry = 1000; fetchStatus(); fetchQueue(); };
+  es.onerror   = () => { es.close(); setTimeout(connectSSE, Math.min(sseRetry *= 2, 30_000)); };
+}
+connectSSE();
 
-  // ── Data ──────────────────────────────────────────────────────────────────
+// ── Status / Queue ────────────────────────────────────────────────────────────
 
-  async function fetchStatus() {
-    try {
-      const s = await apiFetch('/api/status').then(r => r.json());
-      const badge  = document.getElementById('liveBadge');
-      const label  = document.getElementById('liveLabel');
-      const title  = document.getElementById('nowPlaying');
-      const count  = document.getElementById('listenerCount');
-      const status = document.getElementById('statusBar');
+async function fetchStatus() {
+  try {
+    const s = await apiFetch('/api/status').then(r => r.json());
+    const badge  = document.getElementById('liveBadge');
+    const label  = document.getElementById('liveLabel');
+    const title  = document.getElementById('nowPlaying');
+    const status = document.getElementById('statusBar');
+    const count  = document.getElementById('listenerCount');
 
-      if (s.playing && s.current) {
-        badge.className = 'badge live';
-        label.textContent = 'LIVE';
-        title.textContent = s.current.title;
-        status.textContent = `▶ ${s.current.title}`;
-      } else {
-        badge.className = 'badge idle';
-        label.textContent = 'IDLE';
-        title.textContent = '—';
-        status.textContent = 'Idle — add tracks to start streaming';
-      }
-      const n = s.listeners || 0;
-      count.textContent = n === 1 ? '1 listener' : `${n} listeners`;
-      setLoopUI(!!s.loop);
-    } catch (_) {
-      document.getElementById('statusBar').textContent = 'Connection lost — retrying…';
-    }
-  }
-
-  async function fetchQueue() {
-    try {
-      queue = await apiFetch('/api/queue').then(r => r.json()) || [];
-      renderQueue();
-    } catch (_) {
-      // status bar error already shown by fetchStatus
-    }
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  function renderQueue() {
-    const list = document.getElementById('queueList');
-    document.getElementById('queueCount').textContent = queue.length;
-
-    if (!queue.length) {
-      list.innerHTML = '<div class="queue-empty">Queue is empty — add a URL or upload a file</div>';
-      return;
-    }
-
-    list.innerHTML = '';
-    queue.forEach((track, i) => {
-      const el = document.createElement('div');
-      el.className = 'queue-item';
-      el.draggable = true;
-      el.dataset.index = i;
-      el.innerHTML = `
-        <span class="drag-handle" title="Drag to reorder">⠿</span>
-        <span class="track-num">${i + 1}</span>
-        <span class="track-title" title="${esc(track.title)}">${esc(track.title)}</span>
-        <span class="track-tag">${track.is_file ? 'file' : 'url'}</span>
-        <button class="btn-icon" title="Remove" onclick="removeTrack('${track.id}')">×</button>
-      `;
-      el.addEventListener('dragstart', onDragStart);
-      el.addEventListener('dragend',   onDragEnd);
-      el.addEventListener('dragover',  onDragOver);
-      el.addEventListener('dragleave', onDragLeave);
-      el.addEventListener('drop',      onDrop);
-      list.appendChild(el);
-    });
-  }
-
-  // ── Drag & Drop ───────────────────────────────────────────────────────────
-
-  function onDragStart(e) {
-    dragSrcIdx = +e.currentTarget.dataset.index;
-    e.currentTarget.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-  }
-  function onDragEnd(e) {
-    e.currentTarget.classList.remove('dragging');
-    document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
-  }
-  function onDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
-    e.currentTarget.classList.add('drag-over');
-  }
-  function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
-
-  async function onDrop(e) {
-    e.preventDefault();
-    const targetIdx = +e.currentTarget.dataset.index;
-    if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
-
-    const moved = queue.splice(dragSrcIdx, 1)[0];
-    queue.splice(targetIdx, 0, moved);
-    dragSrcIdx = null;
-    renderQueue(); // optimistic
-
-    const r = await apiFetch('/api/queue/reorder', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(queue.map(t => t.id)),
-    });
-    if (!r.ok) {
-      fetchQueue(); // revert to server order on error
-    }
-  }
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
-  async function addURL() {
-    const inp = document.getElementById('urlInput');
-    const src = inp.value.trim();
-    if (!src) return;
-
-    let parsedURL;
-    try { parsedURL = new URL(src); } catch { alert('Invalid URL'); return; }
-    if (parsedURL.protocol !== 'http:' && parsedURL.protocol !== 'https:') {
-      alert('Only http:// and https:// URLs are accepted');
-      return;
-    }
-
-    const title = (() => {
-      try { return decodeURIComponent(parsedURL.pathname.split('/').pop() || src); }
-      catch { return src; }
-    })();
-
-    const r = await apiFetch('/api/queue', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: src, title }),
-    });
-    if (r.ok) { inp.value = ''; }
-    else {
-      const msg = await r.text().catch(() => '');
-      alert('Failed to add URL: ' + (msg || 'check the server logs'));
-    }
-  }
-
-  async function uploadFile(input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    const btn = document.getElementById('uploadBtn');
-    btn.textContent = 'Uploading…';
-    btn.disabled = true;
-
-    const fd = new FormData();
-    fd.append('file', file);
-
-    try {
-      const r = await apiFetch('/api/upload', { method: 'POST', body: fd });
-      if (!r.ok) { alert('Upload failed: ' + await r.text()); }
-    } finally {
-      btn.textContent = 'Upload';
-      btn.disabled = false;
-      input.value = '';
-    }
-  }
-
-  async function removeTrack(id) {
-    queue = queue.filter(t => t.id !== id);
-    renderQueue(); // optimistic
-    await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
-  }
-
-  async function skip() {
-    await apiFetch('/api/skip', { method: 'POST' });
-  }
-
-  function togglePlayer() {
-    const wrap = document.getElementById('playerWrap');
-    const player = document.getElementById('player');
-    const btn = document.getElementById('playerBtn');
-    if (wrap.style.display === 'block') {
-      wrap.style.display = 'none';
-      player.pause();
-      btn.textContent = '▶ Play in browser';
+    if (s.playing && s.current) {
+      badge.className = 'live-badge on';
+      label.textContent = 'LIVE';
+      title.textContent = s.current.title;
+      status.textContent = '▶ ' + s.current.title;
     } else {
-      wrap.style.display = 'block';
-      player.load();
-      player.play().catch(() => {});
-      btn.textContent = '■ Stop player';
+      badge.className = 'live-badge off';
+      label.textContent = 'IDLE';
+      title.textContent = '—';
+      status.textContent = 'Idle';
+    }
+    count.textContent = s.listeners || 0;
+    setLoopUI(!!s.loop);
+  } catch (_) {
+    document.getElementById('statusBar').textContent = 'Bağlantı kesildi — yeniden bağlanılıyor…';
+  }
+}
+
+let queue = [];
+let dragSrcIdx = null;
+
+async function fetchQueue() {
+  try {
+    queue = await apiFetch('/api/queue').then(r => r.json()) || [];
+    renderQueue();
+  } catch (_) {}
+}
+
+function renderQueue() {
+  const list = document.getElementById('queueList');
+  document.getElementById('queueCount').textContent = queue.length;
+  if (!queue.length) {
+    list.innerHTML = '<div class="queue-empty">Kuyruk boş — URL gir veya dosya yükle</div>';
+    return;
+  }
+  list.innerHTML = '';
+  queue.forEach((track, i) => {
+    const el = document.createElement('div');
+    el.className = 'queue-item';
+    el.draggable = true;
+    el.dataset.index = i;
+    el.innerHTML = `
+      <span class="drag-handle" title="Sürükle">⠿</span>
+      <span class="track-num">${i+1}</span>
+      <span class="track-title" title="${esc(track.title)}">${esc(track.title)}</span>
+      <span class="track-tag">${track.is_file ? 'dosya' : 'url'}</span>
+      <button class="btn-icon" title="Sil" onclick="removeTrack('${track.id}')">×</button>
+    `;
+    el.addEventListener('dragstart', e => { dragSrcIdx = +e.currentTarget.dataset.index; e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend',   e => { e.currentTarget.classList.remove('dragging'); document.querySelectorAll('.queue-item').forEach(x => x.classList.remove('drag-over')); });
+    el.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; document.querySelectorAll('.queue-item').forEach(x => x.classList.remove('drag-over')); e.currentTarget.classList.add('drag-over'); });
+    el.addEventListener('dragleave', e => e.currentTarget.classList.remove('drag-over'));
+    el.addEventListener('drop',      onDrop);
+    list.appendChild(el);
+  });
+}
+
+async function onDrop(e) {
+  e.preventDefault();
+  const targetIdx = +e.currentTarget.dataset.index;
+  if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+  const moved = queue.splice(dragSrcIdx, 1)[0];
+  queue.splice(targetIdx, 0, moved);
+  dragSrcIdx = null;
+  renderQueue();
+  const r = await apiFetch('/api/queue/reorder', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(queue.map(t => t.id)),
+  });
+  if (!r.ok) fetchQueue();
+}
+
+// ── Queue actions ─────────────────────────────────────────────────────────────
+
+async function addURL() {
+  const inp = document.getElementById('urlInput');
+  const src = inp.value.trim();
+  if (!src) return;
+  let parsedURL;
+  try { parsedURL = new URL(src); } catch { alert('Geçersiz URL'); return; }
+  if (parsedURL.protocol !== 'http:' && parsedURL.protocol !== 'https:') { alert('Yalnızca http:// veya https:// URL kabul edilir'); return; }
+  const title = (() => { try { return decodeURIComponent(parsedURL.pathname.split('/').pop() || src); } catch { return src; } })();
+  const r = await apiFetch('/api/queue', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:src, title}) });
+  if (r.ok) inp.value = '';
+  else alert('Eklenemedi: ' + (await r.text().catch(()=>'')));
+}
+
+async function uploadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const btn = document.getElementById('uploadBtn');
+  const prev = btn.innerHTML;
+  btn.innerHTML = 'Yükleniyor…';
+  btn.disabled = true;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await apiFetch('/api/upload', { method:'POST', body: fd });
+    if (!r.ok) alert('Yükleme başarısız: ' + await r.text());
+  } finally {
+    btn.innerHTML = prev;
+    btn.disabled = false;
+    input.value = '';
+  }
+}
+
+async function removeTrack(id) {
+  queue = queue.filter(t => t.id !== id);
+  renderQueue();
+  await apiFetch('/api/queue/' + id, { method: 'DELETE' });
+}
+
+async function skip() { await apiFetch('/api/skip', { method: 'POST' }); }
+
+// ── Loop ──────────────────────────────────────────────────────────────────────
+
+let loopOn = false;
+function setLoopUI(on) {
+  loopOn = on;
+  const btn = document.getElementById('loopBtn');
+  btn.classList.toggle('active', on);
+  btn.title = on ? 'Loop: AÇIK' : 'Loop: KAPALI';
+}
+async function toggleLoop() {
+  const next = !loopOn;
+  setLoopUI(next);
+  await apiFetch('/api/loop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({loop:next}) });
+}
+
+// ── Browser Player ────────────────────────────────────────────────────────────
+
+function togglePlayer() {
+  const wrap = document.getElementById('playerWrap');
+  const player = document.getElementById('player');
+  if (wrap.style.display === 'block') {
+    wrap.style.display = 'none';
+    player.pause();
+  } else {
+    wrap.style.display = 'block';
+    player.load();
+    player.play().catch(() => {});
+  }
+}
+
+// ── Audio Engine ──────────────────────────────────────────────────────────────
+// Two independent sources (mic + desktop) are mixed via Web Audio API and
+// sent as a single MediaRecorder stream over WebSocket to the Go backend.
+
+let audioCtx      = null;
+let mixerDest     = null;   // MediaStreamDestination — mixed output
+
+let micStream     = null;
+let micSourceNode = null;
+let micGainNode   = null;
+let micAnalyser   = null;
+let micActive     = false;
+
+let desktopStream     = null;
+let desktopSourceNode = null;
+let desktopGainNode   = null;
+let desktopAnalyser   = null;
+let desktopActive     = false;
+
+let broadcastRecorder = null;
+let broadcastWS       = null;
+let broadcasting      = false;
+let vuAnimId          = null;
+
+let micPeakVal     = 0, micPeakAge     = 0;
+let desktopPeakVal = 0, desktopPeakAge = 0;
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+    mixerDest = audioCtx.createMediaStreamDestination();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+// ── Microphone source ─────────────────────────────────────────────────────────
+
+async function toggleMicSource() {
+  if (micActive) {
+    detachMicSource();
+  } else {
+    await attachMicSource();
+  }
+}
+
+async function attachMicSource() {
+  ensureAudioCtx();
+  const deviceId = document.getElementById('micDeviceSelect').value;
+  const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true, video: false };
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e) {
+    setMicSubLabel('İzin reddedildi', true);
+    return;
+  }
+
+  micSourceNode = audioCtx.createMediaStreamSource(micStream);
+  micGainNode   = audioCtx.createGain();
+  micAnalyser   = audioCtx.createAnalyser();
+  micAnalyser.fftSize = 256;
+  micGainNode.gain.value = document.getElementById('micVolume').value / 100;
+
+  micSourceNode.connect(micGainNode);
+  micGainNode.connect(mixerDest);
+  micSourceNode.connect(micAnalyser);
+
+  micActive = true;
+  document.getElementById('micRow').classList.remove('disabled');
+  document.getElementById('micToggle').textContent = 'Çıkar';
+  document.getElementById('micToggle').classList.add('on');
+  document.getElementById('micIcon').classList.add('active-icon');
+  setMicSubLabel('Aktif', false);
+
+  if (!vuAnimId) startVU();
+
+  // Enumerate mics (needs permission first)
+  await populateMicDevices();
+}
+
+function detachMicSource() {
+  if (micGainNode)   { micGainNode.disconnect(); }
+  if (micSourceNode) { micSourceNode.disconnect(); }
+  if (micStream)     { micStream.getTracks().forEach(t => t.stop()); }
+  micStream = micSourceNode = micGainNode = micAnalyser = null;
+  micActive = false;
+
+  document.getElementById('micRow').classList.add('disabled');
+  document.getElementById('micToggle').textContent = 'Ekle';
+  document.getElementById('micToggle').classList.remove('on');
+  document.getElementById('micIcon').classList.remove('active-icon');
+  setMicSubLabel('Kapalı', false);
+  document.getElementById('micVuBar').style.width  = '0%';
+  document.getElementById('micVuPeak').style.opacity = '0';
+
+  if (!desktopActive && !broadcasting) stopVU();
+}
+
+async function onMicDeviceChange() {
+  if (!micActive) return;
+  detachMicSource();
+  await attachMicSource();
+}
+
+async function populateMicDevices() {
+  const sel = document.getElementById('micDeviceSelect');
+  const prevVal = sel.value;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    sel.innerHTML = '<option value="">Varsayılan mikrofon</option>';
+    mics.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || ('Mikrofon ' + (mics.indexOf(d) + 1));
+      if (d.deviceId === prevVal) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (_) {}
+}
+
+function setMicSubLabel(text, error) {
+  const el = document.getElementById('micSubLabel');
+  el.textContent = text;
+  el.style.color = error ? 'var(--red)' : '';
+}
+
+function onMicVolumeChange(val) {
+  document.getElementById('micVolValue').textContent = val + '%';
+  if (micGainNode) micGainNode.gain.value = val / 100;
+}
+
+// ── Desktop audio source ──────────────────────────────────────────────────────
+
+async function toggleDesktopSource() {
+  if (desktopActive) {
+    detachDesktopSource();
+  } else {
+    await attachDesktopSource();
+  }
+}
+
+async function attachDesktopSource() {
+  ensureAudioCtx();
+  try {
+    desktopStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: false });
+  } catch (e) {
+    setDesktopSubLabel('İzin reddedildi veya desteklenmiyor', true);
+    return;
+  }
+
+  const audioTracks = desktopStream.getAudioTracks();
+  if (!audioTracks.length) {
+    desktopStream.getTracks().forEach(t => t.stop());
+    desktopStream = null;
+    setDesktopSubLabel('Bu ekran/sekme ses içermiyor', true);
+    return;
+  }
+
+  // Stop any video tracks (we only care about audio)
+  desktopStream.getVideoTracks().forEach(t => t.stop());
+
+  desktopSourceNode = audioCtx.createMediaStreamSource(desktopStream);
+  desktopGainNode   = audioCtx.createGain();
+  desktopAnalyser   = audioCtx.createAnalyser();
+  desktopAnalyser.fftSize = 256;
+  desktopGainNode.gain.value = document.getElementById('desktopVolume').value / 100;
+
+  desktopSourceNode.connect(desktopGainNode);
+  desktopGainNode.connect(mixerDest);
+  desktopSourceNode.connect(desktopAnalyser);
+
+  desktopActive = true;
+  document.getElementById('desktopRow').classList.remove('disabled');
+  document.getElementById('desktopToggle').textContent = 'Çıkar';
+  document.getElementById('desktopToggle').classList.add('on');
+  document.getElementById('desktopIcon').classList.add('active-icon');
+  setDesktopSubLabel('Aktif', false);
+
+  if (!vuAnimId) startVU();
+
+  // Auto-detach when the user stops screen sharing from the browser UI
+  audioTracks[0].addEventListener('ended', () => {
+    if (desktopActive) detachDesktopSource();
+  });
+}
+
+function detachDesktopSource() {
+  if (desktopGainNode)   { desktopGainNode.disconnect(); }
+  if (desktopSourceNode) { desktopSourceNode.disconnect(); }
+  if (desktopStream)     { desktopStream.getTracks().forEach(t => t.stop()); }
+  desktopStream = desktopSourceNode = desktopGainNode = desktopAnalyser = null;
+  desktopActive = false;
+
+  document.getElementById('desktopRow').classList.add('disabled');
+  document.getElementById('desktopToggle').textContent = 'Ekle';
+  document.getElementById('desktopToggle').classList.remove('on');
+  document.getElementById('desktopIcon').classList.remove('active-icon');
+  setDesktopSubLabel('Kapalı', false);
+  document.getElementById('desktopVuBar').style.width  = '0%';
+  document.getElementById('desktopVuPeak').style.opacity = '0';
+
+  if (!micActive && !broadcasting) stopVU();
+}
+
+function setDesktopSubLabel(text, error) {
+  const el = document.getElementById('desktopSubLabel');
+  el.textContent = text;
+  el.style.color = error ? 'var(--red)' : '';
+}
+
+function onDesktopVolumeChange(val) {
+  document.getElementById('desktopVolValue').textContent = val + '%';
+  if (desktopGainNode) desktopGainNode.gain.value = val / 100;
+}
+
+// ── VU Meters ─────────────────────────────────────────────────────────────────
+
+function getLevel(analyser) {
+  if (!analyser) return 0;
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(buf);
+  let peak = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const v = Math.abs(buf[i] - 128) / 128;
+    if (v > peak) peak = v;
+  }
+  return peak;
+}
+
+function updateVU(level, barEl, peakEl, peakVal, peakAge) {
+  const pct = Math.min(level * 100, 100);
+  barEl.style.width = pct + '%';
+
+  if (pct > peakVal) { peakVal = pct; peakAge = 0; }
+  else { peakAge++; if (peakAge > 20) peakVal = Math.max(peakVal - 1.5, 0); }
+
+  peakEl.style.left  = peakVal + '%';
+  peakEl.style.opacity = peakVal > 2 ? '0.6' : '0';
+
+  return [peakVal, peakAge];
+}
+
+function startVU() {
+  function frame() {
+    vuAnimId = requestAnimationFrame(frame);
+    if (micActive) {
+      [micPeakVal, micPeakAge] = updateVU(
+        getLevel(micAnalyser),
+        document.getElementById('micVuBar'),
+        document.getElementById('micVuPeak'),
+        micPeakVal, micPeakAge
+      );
+    }
+    if (desktopActive) {
+      [desktopPeakVal, desktopPeakAge] = updateVU(
+        getLevel(desktopAnalyser),
+        document.getElementById('desktopVuBar'),
+        document.getElementById('desktopVuPeak'),
+        desktopPeakVal, desktopPeakAge
+      );
     }
   }
+  frame();
+}
 
-  function esc(s) {
-    return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function stopVU() {
+  if (vuAnimId) { cancelAnimationFrame(vuAnimId); vuAnimId = null; }
+}
+
+// ── Broadcast control ─────────────────────────────────────────────────────────
+
+async function toggleBroadcast() {
+  if (broadcasting) {
+    stopBroadcast();
+  } else {
+    await startBroadcast();
   }
+}
 
-  // ── Loop ──────────────────────────────────────────────────────────────────
-
-  let loopOn = false;
-
-  function setLoopUI(on) {
-    loopOn = on;
-    const btn = document.getElementById('loopBtn');
-    btn.textContent = `↻ Loop: ${on ? 'ON' : 'OFF'}`;
-    btn.classList.toggle('active', on);
+async function startBroadcast() {
+  if (!micActive && !desktopActive) {
+    setBroadcastSub('Önce en az bir ses kaynağı ekle', true);
+    return;
   }
+  ensureAudioCtx();
 
-  async function toggleLoop() {
-    const next = !loopOn;
-    setLoopUI(next);
-    await apiFetch('/api/loop', {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  broadcastWS = new WebSocket(`${proto}://${location.host}/api/mic`);
+  broadcastWS.binaryType = 'arraybuffer';
+
+  broadcastWS.onopen = () => {
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus' : 'audio/webm';
+    broadcastRecorder = new MediaRecorder(mixerDest.stream, { mimeType: mime });
+    broadcastRecorder.ondataavailable = e => {
+      if (e.data.size > 0 && broadcastWS && broadcastWS.readyState === WebSocket.OPEN)
+        e.data.arrayBuffer().then(buf => broadcastWS.send(buf));
+    };
+    broadcastRecorder.start(100);
+    broadcasting = true;
+    setBroadcastUI(true);
+    if (!vuAnimId) startVU();
+  };
+
+  broadcastWS.onclose = e => {
+    if (e.code === 1006 && !broadcastRecorder) {
+      setBroadcastSub('Başka bir yayın aktif', true);
+    }
+    stopBroadcast();
+  };
+  broadcastWS.onerror = () => {};
+}
+
+function stopBroadcast() {
+  if (broadcastRecorder) { broadcastRecorder.stop(); broadcastRecorder = null; }
+  if (broadcastWS)       { broadcastWS.close(); broadcastWS = null; }
+  broadcasting = false;
+  setBroadcastUI(false);
+  if (!micActive && !desktopActive) stopVU();
+}
+
+function setBroadcastUI(live) {
+  const btn = document.getElementById('broadcastBtn');
+  if (live) {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Yayını Durdur`;
+    btn.classList.add('live');
+    setBroadcastLabel('Canlı yayın aktif', false);
+    setBroadcastSub('Ses yayınlanıyor…', false);
+  } else {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg> Yayına Başla`;
+    btn.classList.remove('live');
+    setBroadcastLabel('Yayın kapalı', false);
+    setBroadcastSub('Kaynak seç ve yayını başlat', false);
+  }
+}
+
+function setBroadcastLabel(text, error) {
+  const el = document.getElementById('broadcastLabel');
+  el.textContent = text;
+  el.style.color = error ? 'var(--red)' : '';
+}
+function setBroadcastSub(text, error) {
+  const el = document.getElementById('broadcastSub');
+  el.textContent = text;
+  el.style.color = error ? 'var(--amber)' : '';
+}
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+
+async function generateTTS() {
+  const text   = document.getElementById('ttsText').value.trim();
+  const apiKey = document.getElementById('elApiKey').value.trim();
+  const voice  = document.getElementById('elVoice').value;
+  const model  = document.getElementById('elModel').value;
+  const btn    = document.getElementById('ttsBtn');
+
+  if (!apiKey) { setTTSStatus('API key gerekli', 'error'); return; }
+  if (!text)   { setTTSStatus('Metin gerekli', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Oluşturuluyor…';
+  setTTSStatus('ElevenLabs\'a gönderiliyor…', '');
+
+  try {
+    const r = await apiFetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ loop: next }),
+      body: JSON.stringify({ text, api_key: apiKey, voice_id: voice, model_id: model }),
     });
-  }
-
-  // ── Live Mic ──────────────────────────────────────────────────────────────
-
-  let micStream = null, micRecorder = null, micWS = null;
-
-  async function toggleMic() {
-    micWS ? stopMic() : startMic();
-  }
-
-  async function startMic() {
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    } catch (_) {
-      setMicStatus('Mikrofon izni gerekli', true); return;
+    if (r.ok) {
+      document.getElementById('ttsText').value = '';
+      setTTSStatus('Sıraya eklendi ✓', 'ok');
+      setTimeout(() => setTTSStatus('API key gir ve metni yaz', ''), 3000);
+    } else {
+      setTTSStatus(await r.text() || 'Hata oluştu', 'error');
     }
-
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    micWS = new WebSocket(`${proto}://${location.host}/api/mic`);
-    micWS.binaryType = 'arraybuffer';
-
-    micWS.onopen = () => {
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus' : 'audio/webm';
-      micRecorder = new MediaRecorder(micStream, { mimeType: mime });
-      micRecorder.ondataavailable = e => {
-        if (e.data.size > 0 && micWS && micWS.readyState === WebSocket.OPEN)
-          e.data.arrayBuffer().then(buf => micWS.send(buf));
-      };
-      micRecorder.start(100);
-      const btn = document.getElementById('micBtn');
-      btn.textContent = '⏹ Durdur';
-      btn.classList.add('active');
-      setMicStatus('🔴 Canlı yayın aktif', false);
-    };
-
-    micWS.onclose = e => {
-      if (e.code === 1006 && !micRecorder) {
-        setMicStatus('Başka bir yayın aktif', true);
-        if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-        micWS = null;
-      } else {
-        stopMic();
-      }
-    };
-    micWS.onerror = () => {};
+  } catch (_) {
+    setTTSStatus('Sunucuya ulaşılamadı', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Oluştur & Sıraya Ekle';
   }
+}
 
-  function stopMic() {
-    if (micRecorder) { micRecorder.stop(); micRecorder = null; }
-    if (micStream)   { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-    if (micWS)       { micWS.close(); micWS = null; }
-    const btn = document.getElementById('micBtn');
-    btn.textContent = '🎙 Başlat';
-    btn.classList.remove('active');
-    setMicStatus('Mikrofon kapalı', false);
-  }
+function setTTSStatus(msg, cls) {
+  const el = document.getElementById('ttsStatus');
+  el.textContent = msg;
+  el.className = 'tts-hint' + (cls ? ' ' + cls : '');
+}
 
-  function setMicStatus(msg, err) {
-    const el = document.getElementById('micStatus');
-    el.textContent = msg;
-    el.style.color = err ? '#ff5555' : '#666';
-  }
+document.getElementById('ttsText').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generateTTS();
+});
 
-  // ── TTS ───────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-  async function generateTTS() {
-    const text   = document.getElementById('ttsText').value.trim();
-    const apiKey = document.getElementById('elApiKey').value.trim();
-    const voice  = document.getElementById('elVoice').value;
-    const model  = document.getElementById('elModel').value;
-    const status = document.getElementById('ttsStatus');
-    const btn    = document.getElementById('ttsBtn');
+const savedKey   = localStorage.getItem('el_api_key');
+const savedVoice = localStorage.getItem('el_voice');
+const savedModel = localStorage.getItem('el_model');
+if (savedKey)   document.getElementById('elApiKey').value = savedKey;
+if (savedVoice) document.getElementById('elVoice').value  = savedVoice;
+if (savedModel) document.getElementById('elModel').value  = savedModel;
 
-    if (!apiKey) { setTTSStatus('API key gerekli', 'error'); return; }
-    if (!text)   { setTTSStatus('Metin gerekli', 'error'); return; }
+// Try to enumerate mics without prompting (may return empty labels until permission granted)
+populateMicDevices();
+navigator.mediaDevices?.addEventListener('devicechange', populateMicDevices);
 
-    btn.disabled = true;
-    btn.textContent = 'Oluşturuluyor…';
-    setTTSStatus('ElevenLabs\'a gönderiliyor…', '');
-
-    try {
-      const r = await apiFetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, api_key: apiKey, voice_id: voice, model_id: model }),
-      });
-
-      if (r.ok) {
-        document.getElementById('ttsText').value = '';
-        setTTSStatus('Sıraya eklendi ✓', 'ok');
-        setTimeout(() => setTTSStatus('API key\'ini gir ve metni yaz', ''), 3000);
-      } else {
-        const msg = await r.text();
-        setTTSStatus(msg || 'Hata oluştu', 'error');
-      }
-    } catch (e) {
-      setTTSStatus('Sunucuya ulaşılamadı', 'error');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Oluştur & Sıraya Ekle';
-    }
-  }
-
-  function setTTSStatus(msg, cls) {
-    const el = document.getElementById('ttsStatus');
-    el.textContent = msg;
-    el.className = 'tts-hint' + (cls ? ' ' + cls : '');
-  }
-
-  // Ctrl+Enter in textarea → generate
-  document.getElementById('ttsText').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generateTTS();
-  });
-
-  // ── Init ──────────────────────────────────────────────────────────────────
-
-  // Restore localStorage settings
-  const savedKey   = localStorage.getItem('el_api_key');
-  const savedVoice = localStorage.getItem('el_voice');
-  const savedModel = localStorage.getItem('el_model');
-  if (savedKey)   document.getElementById('elApiKey').value = savedKey;
-  if (savedVoice) document.getElementById('elVoice').value  = savedVoice;
-  if (savedModel) document.getElementById('elModel').value  = savedModel;
-
-  // Initial load
-  fetchStatus();
-  fetchQueue();
+fetchStatus();
+fetchQueue();
 </script>
 </body>
 </html>

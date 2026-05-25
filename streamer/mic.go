@@ -16,17 +16,16 @@ import (
 
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		return origin == "" || origin == "http://"+r.Host || origin == "https://"+r.Host
+		return true // Tüm Origin'lere (kaynaklara) izin ver
 	},
 }
 
 // ── PCM Mixer ────────────────────────────────────────────────────────────────
 
 const (
-	mixRate      = 44100
-	mixCh        = 2
-	mixInterval  = 20 * time.Millisecond
+	mixRate     = 44100
+	mixCh       = 2
+	mixInterval = 20 * time.Millisecond
 	// bytes for one 20 ms chunk: 44100 * 2ch * 4 bytes(f32) * 0.02s
 	mixChunk     = int(float64(mixRate*mixCh*4) * 0.02)
 	maxMicBuf    = mixChunk * 50 // ~1 second of audio per input
@@ -60,13 +59,13 @@ func (m *micInput) drain(n int) []byte {
 }
 
 type micMixer struct {
-	mu      sync.Mutex
-	inputs  map[string]*micInput
-	encIn   io.WriteCloser
-	encCmd  *exec.Cmd
-	cancel  context.CancelFunc
-	ticker  *time.Ticker
-	done    chan struct{}
+	mu     sync.Mutex
+	inputs map[string]*micInput
+	encIn  io.WriteCloser
+	encCmd *exec.Cmd
+	cancel context.CancelFunc
+	ticker *time.Ticker
+	done   chan struct{}
 }
 
 var mx = &micMixer{inputs: make(map[string]*micInput)}

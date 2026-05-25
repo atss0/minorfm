@@ -111,5 +111,5 @@ func (h *Handler) GetRooms(c *fiber.Ctx) error {
 	if err := h.DB.Order("name ASC").Find(&rooms).Error; err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "could not fetch rooms")
 	}
-	return c.JSON(fiber.Map{"data": rooms})
+	return c.JSON(fiber.Map{"rooms": rooms})
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "207903691012",
+    "project_id": "minorfm-61f0c",
+    "storage_bucket": "minorfm-61f0c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:207903691012:android:16c9e83251a4c5685e4051",
+        "android_client_info": {
+          "package_name": "fm.minor.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmbm0PXMF2fUUC_FQQpDwYISv61Dc1zrY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

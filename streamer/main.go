@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -128,15 +129,37 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // ── Stream ───────────────────────────────────────────────────────────────────
 
+const icyMetaInt = 8192
+
+func buildIcyMeta(track *Track) []byte {
+	title := ""
+	if track != nil {
+		title = strings.ReplaceAll(track.Title, "'", "\\'")
+	}
+	s := fmt.Sprintf("StreamTitle='%s';", title)
+	blocks := (len(s) + 15) / 16
+	meta := make([]byte, 1+blocks*16)
+	meta[0] = byte(blocks)
+	copy(meta[1:], []byte(s))
+	return meta
+}
+
 func handleStream(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
+
+	wantMeta := r.Header.Get("Icy-MetaData") == "1"
+
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.Header().Set("Cache-Control", "no-cache, no-store")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("icy-name", "MINOR.fm")
+	if wantMeta {
+		w.Header().Set("icy-metaint", strconv.Itoa(icyMetaInt))
+	}
 
 	ch := bc.Subscribe()
 	defer bc.Unsubscribe(ch)
@@ -144,14 +167,37 @@ func handleStream(w http.ResponseWriter, r *http.Request) {
 	log.Printf("+ listener %s (total: %d)", r.RemoteAddr, bc.ListenerCount())
 	defer log.Printf("- listener %s (total: %d)", r.RemoteAddr, bc.ListenerCount()-1)
 
+	byteCount := 0
+
 	for {
 		select {
 		case chunk, ok := <-ch:
 			if !ok {
 				return
 			}
-			if _, err := w.Write(chunk); err != nil {
-				return
+			if wantMeta {
+				pos := 0
+				for pos < len(chunk) {
+					space := icyMetaInt - byteCount
+					if remaining := len(chunk) - pos; space > remaining {
+						space = remaining
+					}
+					if _, err := w.Write(chunk[pos : pos+space]); err != nil {
+						return
+					}
+					pos += space
+					byteCount += space
+					if byteCount >= icyMetaInt {
+						if _, err := w.Write(buildIcyMeta(bc.Current())); err != nil {
+							return
+						}
+						byteCount = 0
+					}
+				}
+			} else {
+				if _, err := w.Write(chunk); err != nil {
+					return
+				}
 			}
 			flusher.Flush()
 		case <-r.Context().Done():
@@ -177,8 +223,21 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 	ch := bc.subscribeSSE()
 	defer bc.unsubscribeSSE(ch)
 
-	fmt.Fprintf(w, "data: update\n\n")
-	flusher.Flush()
+	sendUpdate := func() {
+		cur := bc.Current()
+		title := ""
+		if cur != nil {
+			title = cur.Title
+		}
+		data, _ := json.Marshal(map[string]any{
+			"playing": bc.IsPlaying(),
+			"title":   title,
+		})
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
+	sendUpdate()
 
 	for {
 		select {
@@ -186,8 +245,7 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: update\n\n")
-			flusher.Flush()
+			sendUpdate()
 		case <-r.Context().Done():
 			return
 		}
