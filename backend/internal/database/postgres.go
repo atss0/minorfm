@@ -53,8 +53,18 @@ func NewPostgres(dsn string) (*gorm.DB, error) {
 	}
 
 	seedCategories(db)
+	seedBroadcastRoom(db)
 
 	return db, nil
+}
+
+func seedBroadcastRoom(db *gorm.DB) {
+	db.Where(models.ChatRoom{Slug: "broadcast"}).
+		FirstOrCreate(&models.ChatRoom{
+			Name: "Yayın Sohbeti",
+			Slug: "broadcast",
+			Type: "broadcast",
+		})
 }
 
 func seedCategories(db *gorm.DB) {
