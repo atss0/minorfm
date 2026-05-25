@@ -75,6 +75,10 @@ yarn-error.log
 android/app/release.keystore
 android/app/*.jks
 
+# Firebase — contains API keys, never commit
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
 # Yarn
 .yarn/*
 !.yarn/patches
