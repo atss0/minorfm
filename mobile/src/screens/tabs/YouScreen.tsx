@@ -1,11 +1,12 @@
-import React, {useCallback} from 'react';
-import {ScrollView, StyleSheet, TouchableOpacity, View} from 'react-native';
+import React, {useCallback, useState} from 'react';
+import {RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useQuery} from '@tanstack/react-query';
 import TrackPlayer from 'react-native-track-player';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import {useAuthStore} from '../../stores/authStore';
+import {useQueryClient} from '@tanstack/react-query';
 import {usersApi} from '../../api/users';
 import {recordingsApi} from '../../api/recordings';
 import {useRecordingsStore} from '../../stores/recordingsStore';
@@ -29,7 +30,23 @@ interface Recording {
 
 export default function YouScreen() {
   const navigation = useNavigation<Nav>();
-  const {user} = useAuthStore();
+  const {user, updateUser} = useAuthStore();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await usersApi.getMe();
+      const me = res.data?.user ?? res.data;
+      if (me) updateUser(me);
+    } catch {}
+    await Promise.all([
+      queryClient.invalidateQueries({queryKey: ['profile', user?.username]}),
+      queryClient.invalidateQueries({queryKey: ['recordings']}),
+    ]);
+    setRefreshing(false);
+  }, [user?.username, updateUser, queryClient]);
   const {currentIndex, isPlaying, progress, setQueue, setIndex, setPlaying} =
     useRecordingsStore();
 
@@ -81,7 +98,15 @@ export default function YouScreen() {
     <ScrollView
       style={styles.root}
       contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}>
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }>
       <View style={styles.topActions}>
         <AppText variant="heading" style={styles.screenTitle}>
           minor.fm
