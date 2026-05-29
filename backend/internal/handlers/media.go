@@ -47,6 +47,8 @@ func (h *Handler) UploadAvatar(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.InvalidateSession(userID)
+
 	return c.JSON(fiber.Map{
 		"avatar_url":    avatarURL,
 		"original_url":  result.URL,
