@@ -4,3 +4,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autoli
 rootProject.name = 'MinorFM'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// react-native-nitro-sound has no react-native.config.js so RN autolinking skips it; include manually
+include ':react-native-nitro-sound'
+project(':react-native-nitro-sound').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-nitro-sound/android')

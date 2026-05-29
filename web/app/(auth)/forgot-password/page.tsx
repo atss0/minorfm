@@ -8,9 +8,8 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <Link href="/" className="inline-block font-black text-2xl tracking-tight">
-            M<span className="text-primary">İ</span>NOR
-            <span className="text-muted font-light">.fm</span>
+          <Link href="/" className="inline-block">
+            <img src="/logo.svg" alt="MINOR.fm" className="h-7 w-auto" />
           </Link>
           <p className="text-muted mt-2 text-sm">
             E-posta adresini gir, sıfırlama bağlantısı gönderelim

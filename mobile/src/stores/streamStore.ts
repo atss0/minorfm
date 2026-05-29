@@ -3,6 +3,7 @@ import {create} from 'zustand';
 interface StreamMeta {
   artist: string;
   title: string;
+  cover_url?: string;
 }
 
 interface StreamState {

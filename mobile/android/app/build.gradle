@@ -114,6 +114,8 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    // Manually linked — package has no react-native.config.js so RN autolinking skips it
+    implementation project(':react-native-nitro-sound')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

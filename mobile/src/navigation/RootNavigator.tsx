@@ -1,8 +1,9 @@
-import React, {useEffect, useState} from 'react';
-import {ActivityIndicator, StyleSheet, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {ActivityIndicator, Linking, StyleSheet, View} from 'react-native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useAuthStore} from '../stores/authStore';
 import {colors} from '../theme';
+import {navigationRef} from './navigationRef';
 import {
   registerDeviceToken,
   setExternalUserId,
@@ -27,7 +28,7 @@ export type AuthStackParamList = {
 };
 
 export type AppStackParamList = {
-  Main: undefined;
+  Main: {initialTab?: number} | undefined;
   Profile: {username: string};
   PostDetail: {id: string};
   DMConversation: {roomId: string; name?: string};
@@ -35,6 +36,37 @@ export type AppStackParamList = {
   Notifications: undefined;
   Search: {mode?: 'dm'} | undefined;
 };
+
+// Parse a deep link URL into a screen + params pair.
+// Used to replay a pending link after the user logs in.
+function parseDeepLink(
+  url: string,
+): {screen: keyof AppStackParamList; params?: object} | null {
+  try {
+    const path = url
+      .replace(/^minorfm:\/\//, '/')
+      .replace(/^https?:\/\/minor\.fm/, '')
+      .replace(/^\/\//, '/');
+
+    const [, first, second] = path.split('/');
+
+    if (!first) return {screen: 'Main', params: {initialTab: 2}};
+    if (first === 'profile' && second) return {screen: 'Profile', params: {username: second}};
+    if (first === 'post' && second) return {screen: 'PostDetail', params: {id: second}};
+    if (first === 'dm' && second) return {screen: 'DMConversation', params: {roomId: second}};
+    if (first === 'dm') return {screen: 'Main', params: {initialTab: 3}};
+    if (first === 'settings') return {screen: 'Settings'};
+    if (first === 'notifications') return {screen: 'Notifications'};
+    if (first === 'search') return {screen: 'Search'};
+    if (first === 'chat') return {screen: 'Main', params: {initialTab: 1}};
+    if (first === 'rec') return {screen: 'Main', params: {initialTab: 2}};
+    if (first === 'deck') return {screen: 'Main', params: {initialTab: 0}};
+    if (first === 'you') return {screen: 'Main', params: {initialTab: 4}};
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
@@ -66,6 +98,7 @@ function AppNavigator() {
 export default function RootNavigator() {
   const {accessToken} = useAuthStore();
   const [hydrating, setHydrating] = useState(true);
+  const pendingUrlRef = useRef<string | null>(null);
 
   // AsyncStorage'dan token'ı oku — persist middleware bunu otomatik yapıyor
   // ama ilk render için hydration bekle
@@ -73,6 +106,43 @@ export default function RootNavigator() {
     const timer = setTimeout(() => setHydrating(false), 100);
     return () => clearTimeout(timer);
   }, []);
+
+  // Giriş yapmamışken gelen deep link'i sakla
+  useEffect(() => {
+    if (accessToken) return;
+
+    Linking.getInitialURL().then(url => {
+      if (url) pendingUrlRef.current = url;
+    });
+
+    const sub = Linking.addEventListener('url', ({url}) => {
+      pendingUrlRef.current = url;
+    });
+
+    return () => sub.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Giriş yapıldıktan sonra saklanan deep link'e git
+  useEffect(() => {
+    if (!accessToken || !pendingUrlRef.current) return;
+
+    const url = pendingUrlRef.current;
+    pendingUrlRef.current = null;
+
+    const tryNavigate = (attempts = 0) => {
+      if (!navigationRef.isReady()) {
+        if (attempts < 10) setTimeout(() => tryNavigate(attempts + 1), 100);
+        return;
+      }
+      const target = parseDeepLink(url);
+      if (target) {
+        navigationRef.navigate(target.screen as any, target.params as any);
+      }
+    };
+
+    setTimeout(tryNavigate, 200);
+  }, [accessToken]);
 
   // OneSignal: kullanıcı giriş/çıkışına göre external ID güncelle
   useEffect(() => {

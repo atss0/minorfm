@@ -1,6 +1,5 @@
-import React from 'react';
-import {StyleSheet, Text, View, ViewStyle} from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import React, {useState, useEffect} from 'react';
+import {Image, StyleSheet, Text, View, ViewStyle} from 'react-native';
 import {colors} from '../theme';
 import {getInitials} from '../utils/format';
 
@@ -12,15 +11,20 @@ interface Props {
 }
 
 export default function Avatar({uri, username, size = 40, style}: Props) {
+  const [failed, setFailed] = useState(false);
   const borderRadius = size / 2;
 
-  if (uri) {
+  useEffect(() => {
+    setFailed(false);
+  }, [uri]);
+
+  if (uri && !failed) {
     return (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <FastImage
-        source={{uri, priority: FastImage.priority.normal}}
-        style={[{width: size, height: size, borderRadius}, style] as any}
-        resizeMode={FastImage.resizeMode.cover}
+      <Image
+        source={{uri}}
+        style={[{width: size, height: size, borderRadius}, style]}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
       />
     );
   }

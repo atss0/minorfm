@@ -1,5 +1,5 @@
 import React, {useCallback} from 'react';
-import {StyleSheet, TouchableOpacity, View, StatusBar} from 'react-native';
+import {Image, StyleSheet, TouchableOpacity, View, StatusBar} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -10,8 +10,9 @@ import Animated, {
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import HapticFeedback from 'react-native-haptic-feedback';
 import AppText from './AppText';
-import {colors, spacing, PLAYER_HEADER_HEIGHT} from '../theme';
+import {colors, spacing, radius, PLAYER_HEADER_HEIGHT} from '../theme';
 import {useStream} from '../hooks/useStream';
+import {radioApi} from '../api/radio';
 
 const HAPTIC_OPTIONS = {enableVibrateFallback: true, ignoreAndroidSystemSettings: false};
 
@@ -19,7 +20,7 @@ export default function PlayerHeader() {
   const {isPlaying, isBuffering, currentMeta, togglePlay} = useStream();
 
   const heartScale = useSharedValue(1);
-  const heartColor = useSharedValue(0); // 0 = outline, 1 = filled
+  const heartColor = useSharedValue(0);
 
   const heartStyle = useAnimatedStyle(() => ({
     transform: [{scale: heartScale.value}],
@@ -35,28 +36,29 @@ export default function PlayerHeader() {
       withTiming(1, {duration: 80}),
       withTiming(0, {duration: 1200}),
     );
+    radioApi.superlike().catch(() => {});
   }, [heartScale, heartColor]);
 
-  const iconColor = useAnimatedStyle(() => ({
-    // colour changes handled by swapping the icon name below
+  const iconOpacity = useAnimatedStyle(() => ({
     opacity: 1 - heartColor.value * 0.3,
   }));
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
-      <TouchableOpacity
-        style={[styles.playBtn, isBuffering && styles.playBtnDisabled]}
-        onPress={togglePlay}
-        disabled={isBuffering}
-        activeOpacity={0.75}>
-        <MaterialIcon
-          name={isPlaying ? 'pause' : 'play-arrow'}
-          size={24}
-          color={colors.textPrimary}
-        />
-      </TouchableOpacity>
 
+      {/* Cover art */}
+      <View style={styles.coverWrap}>
+        {currentMeta?.cover_url ? (
+          <Image source={{uri: currentMeta.cover_url}} style={styles.cover} />
+        ) : (
+          <View style={styles.coverPlaceholder}>
+            <MaterialIcon name="music-note" size={22} color={colors.textSecondary} />
+          </View>
+        )}
+      </View>
+
+      {/* Artist / title */}
       <View style={styles.meta}>
         {isBuffering ? (
           <AppText variant="caption" style={styles.connecting}>
@@ -74,8 +76,22 @@ export default function PlayerHeader() {
         )}
       </View>
 
+      {/* Play / pause */}
+      <TouchableOpacity
+        style={[styles.playBtn, isBuffering && styles.playBtnDisabled]}
+        onPress={togglePlay}
+        disabled={isBuffering}
+        activeOpacity={0.75}>
+        <MaterialIcon
+          name={isPlaying ? 'pause' : 'play-arrow'}
+          size={24}
+          color={colors.textPrimary}
+        />
+      </TouchableOpacity>
+
+      {/* Superheart */}
       <TouchableOpacity style={styles.superlikeBtn} onPress={handleSuperlike} activeOpacity={0.7}>
-        <Animated.View style={[heartStyle, iconColor]}>
+        <Animated.View style={[heartStyle, iconOpacity]}>
           <MaterialIcon name="favorite" size={22} color={colors.primary} />
         </Animated.View>
       </TouchableOpacity>
@@ -92,6 +108,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  coverWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  cover: {
+    width: 40,
+    height: 40,
+  },
+  coverPlaceholder: {
+    width: 40,
+    height: 40,
+    backgroundColor: colors.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+  },
+  meta: {
+    flex: 1,
+  },
+  connecting: {
+    color: colors.textSecondary,
   },
   playBtn: {
     width: 38,
@@ -105,13 +148,6 @@ const styles = StyleSheet.create({
   },
   playBtnDisabled: {
     opacity: 0.5,
-  },
-  meta: {
-    flex: 1,
-    marginHorizontal: spacing.md,
-  },
-  connecting: {
-    color: colors.textSecondary,
   },
   superlikeBtn: {
     padding: spacing.xs,

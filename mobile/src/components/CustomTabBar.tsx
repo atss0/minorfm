@@ -8,10 +8,11 @@ import {useAuthStore} from '../stores/authStore';
 import Avatar from './Avatar';
 import {colors, spacing} from '../theme';
 
+// Deck=0, Chat=1, Rec=2(center), DM=3, Profile=4
 const TAB_ITEMS = [
-  {index: 0, icon: 'chat'},
-  {index: 1, icon: 'headphones'},
-  {index: 2, icon: 'people'},
+  {index: 0, icon: 'radio'},
+  {index: 1, icon: 'chat'},
+  {index: 2, icon: 'mic'},
   {index: 3, icon: 'mail'},
   {index: 4, icon: 'person'},
 ] as const;
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export default function CustomTabBar({onTabPress}: Props) {
-  const {activeTabIndex, chatUnreadCount, dmUnreadCount} = useUIStore();
+  const {activeTabIndex, chatUnreadCount, dmUnreadCount, triggerStartRecording} = useUIStore();
   const {user} = useAuthStore();
   const recScale = useSharedValue(1);
 
@@ -31,18 +32,25 @@ export default function CustomTabBar({onTabPress}: Props) {
 
   const handlePress = (index: number) => {
     if (index === 2) {
-      recScale.value = withSpring(0.82, {damping: 15}, (finished) => {
+      recScale.value = withSpring(0.82, {damping: 15}, finished => {
         'worklet';
         if (finished) {
           recScale.value = withSpring(1, {damping: 12});
         }
       });
+      // If already on RecScreen: trigger recording; otherwise navigate to RecScreen
+      if (activeTabIndex === 2) {
+        triggerStartRecording();
+      } else {
+        onTabPress(2);
+      }
+    } else {
+      onTabPress(index);
     }
-    onTabPress(index);
   };
 
   const getBadge = (index: number) => {
-    if (index === 0) return chatUnreadCount > 0;
+    if (index === 1) return chatUnreadCount > 0;
     if (index === 3) return dmUnreadCount > 0;
     return false;
   };
@@ -64,7 +72,7 @@ export default function CustomTabBar({onTabPress}: Props) {
                 onPress={() => handlePress(2)}
                 activeOpacity={0.85}>
                 <Animated.View style={[styles.recButton, recAnimStyle]}>
-                  <MaterialIcon name="people" size={26} color={colors.textPrimary} />
+                  <MaterialIcon name="mic" size={26} color={colors.textPrimary} />
                 </Animated.View>
               </TouchableOpacity>
             );
@@ -77,7 +85,7 @@ export default function CustomTabBar({onTabPress}: Props) {
               onPress={() => handlePress(tab.index)}
               activeOpacity={0.7}>
               <View style={styles.iconWrapper}>
-                {isYou && user?.avatar_url ? (
+                {isYou && user ? (
                   <View style={[styles.avatarRing, isActive && styles.avatarRingActive]}>
                     <Avatar uri={user.avatar_url} username={user.username} size={24} />
                   </View>

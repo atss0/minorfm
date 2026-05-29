@@ -1,21 +1,29 @@
 import React, {useCallback, useRef, useState} from 'react';
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
+import {showMessage} from 'react-native-flash-message';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
+import RecordingCard from '../../components/RecordingCard';
 import {colors, spacing, radius} from '../../theme';
 import {timeAgo} from '../../utils/time';
 import {useBroadcastChat} from '../../hooks/useBroadcastChat';
+import {useRecordingsAudio, RecordingItem} from '../../hooks/useRecordingsAudio';
 import {useAuthStore} from '../../stores/authStore';
+import {useRecordingsStore} from '../../stores/recordingsStore';
+import {recordingsApi} from '../../api/recordings';
 
 interface ChatMessage {
   id: string;
@@ -26,6 +34,10 @@ interface ChatMessage {
   createdAt: string;
 }
 
+type FeedItem =
+  | {kind: 'message'; id: string; ts: string; data: ChatMessage}
+  | {kind: 'recording'; id: string; ts: string; data: RecordingItem};
+
 export default function ChatScreen() {
   const {user} = useAuthStore();
   const {messages, isConnected, sendMessage} = useBroadcastChat();
@@ -34,62 +46,145 @@ export default function ChatScreen() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [newMsgCount, setNewMsgCount] = useState(0);
 
+  const {currentIndex, isPlaying, progress} = useRecordingsStore();
+  const {play, pause, resume} = useRecordingsAudio();
+  const queryClient = useQueryClient();
+
+  const {data: recData, isRefetching, refetch} = useQuery({
+    queryKey: ['recordings'],
+    queryFn: () => recordingsApi.getList().then(r => r.data),
+    refetchInterval: 30_000,
+  });
+  const recordings: RecordingItem[] = recData?.recordings ?? recData ?? [];
+
+  // Merge messages + recordings, oldest first (top-to-bottom feed)
+  const feedItems: FeedItem[] = [
+    ...messages.map(m => ({kind: 'message' as const, id: m.id, ts: m.createdAt, data: m})),
+    ...recordings.map(r => ({kind: 'recording' as const, id: r.id, ts: r.created_at, data: r})),
+  ].sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+
+  const handleRecordingPress = useCallback(
+    async (recording: RecordingItem, listIndex: number) => {
+      try {
+        const recIndex = recordings.indexOf(recording);
+        const isSameAndPlaying = currentIndex === recIndex && isPlaying;
+        if (isSameAndPlaying) { await pause(); return; }
+        if (currentIndex === recIndex && !isPlaying) { await resume(); return; }
+        await play(recordings, recIndex);
+      } catch {
+        showMessage({message: 'Kayıt çalınamadı', type: 'danger'});
+      }
+    },
+    [currentIndex, isPlaying, pause, resume, play, recordings],
+  );
+
+  const handleLongPress = useCallback(
+    (recording: RecordingItem) => {
+      if (user?.id !== recording.user_id) return;
+      Alert.alert('Kaydı Sil', 'Bu kaydı silmek istediğinden emin misin?', [
+        {text: 'İptal', style: 'cancel'},
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await recordingsApi.delete(recording.id);
+              await queryClient.invalidateQueries({queryKey: ['recordings']});
+              showMessage({message: 'Kayıt silindi', type: 'success'});
+            } catch {
+              showMessage({message: 'Kayıt silinemedi', type: 'danger'});
+            }
+          },
+        },
+      ]);
+    },
+    [queryClient, user?.id],
+  );
+
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || !user) return;
     sendMessage(trimmed);
     setText('');
+    setAutoScroll(true);
+    setNewMsgCount(0);
   }, [text, user, sendMessage]);
 
-  const handleScrollEnd = useCallback(({nativeEvent}: {nativeEvent: {contentOffset: {y: number}}}) => {
-    const atBottom = nativeEvent.contentOffset.y <= 10;
-    setAutoScroll(atBottom);
-    if (atBottom) setNewMsgCount(0);
-  }, []);
+  const handleScrollEnd = useCallback(
+    ({nativeEvent}: {nativeEvent: {contentOffset: {y: number}; contentSize: {height: number}; layoutMeasurement: {height: number}}}) => {
+      const {contentOffset, contentSize, layoutMeasurement} = nativeEvent;
+      const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 40;
+      setAutoScroll(atBottom);
+      if (atBottom) setNewMsgCount(0);
+    },
+    [],
+  );
 
   const scrollToBottom = () => {
-    flatListRef.current?.scrollToOffset({offset: 0, animated: true});
+    flatListRef.current?.scrollToEnd({animated: true});
     setNewMsgCount(0);
     setAutoScroll(true);
   };
 
-  const renderMessage = ({item}: {item: ChatMessage}) => (
-    <Pressable
-      style={styles.msgRow}
-      onLongPress={() => {
-        // TODO: copy to clipboard
-      }}>
-      <Avatar uri={item.user.avatar_url} username={item.user.username} size={32} />
-      <View style={styles.msgContent}>
-        <View style={styles.msgHeader}>
-          <AppText variant="caption" style={styles.username}>
-            {item.user.username}
-          </AppText>
-          <AppText variant="caption" style={styles.time}>
-            {timeAgo(item.createdAt)}
+  const renderItem = ({item, index}: {item: FeedItem; index: number}) => {
+    if (item.kind === 'recording') {
+      const recIndex = recordings.indexOf(item.data);
+      return (
+        <RecordingCard
+          recording={item.data}
+          isPlaying={currentIndex === recIndex && isPlaying}
+          progress={currentIndex === recIndex ? progress : 0}
+          onPress={() => handleRecordingPress(item.data, index)}
+          onLongPress={user?.id === item.data.user_id ? () => handleLongPress(item.data) : undefined}
+        />
+      );
+    }
+
+    const msg = item.data;
+    const isOwn = msg.userId === user?.id;
+
+    if (isOwn) {
+      return (
+        <View style={styles.ownRow}>
+          <View style={styles.ownBubble}>
+            <AppText variant="caption" style={styles.ownTime}>
+              {timeAgo(msg.createdAt)}
+            </AppText>
+            <AppText variant="body" style={styles.ownText}>
+              {msg.body}
+            </AppText>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.msgRow}>
+        <Avatar uri={msg.user.avatar_url} username={msg.user.username} size={32} />
+        <View style={styles.msgContent}>
+          <View style={styles.msgHeader}>
+            <AppText variant="caption" style={styles.username}>
+              {msg.user.username}
+            </AppText>
+            <AppText variant="caption" style={styles.time}>
+              {timeAgo(msg.createdAt)}
+            </AppText>
+          </View>
+          <AppText variant="body" style={styles.msgText}>
+            {msg.body}
           </AppText>
         </View>
-        <AppText variant="body" style={styles.msgText}>
-          {item.body}
-        </AppText>
-      </View>
-    </Pressable>
-  );
-
-  if (!user) {
-    return (
-      <View style={styles.authBanner}>
-        <AppText variant="caption">Sohbete katılmak için giriş yapmalısın.</AppText>
       </View>
     );
-  }
+  };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}>
-      {!isConnected && (
+
+      {user && !isConnected && (
         <View style={styles.connectingBar}>
           <AppText variant="caption" style={styles.connectingText}>
             Bağlanıyor...
@@ -99,19 +194,33 @@ export default function ChatScreen() {
 
       <FlatList
         ref={flatListRef}
-        data={[...messages].reverse()}
-        keyExtractor={item => item.id}
-        inverted
-        renderItem={renderMessage}
+        data={feedItems}
+        keyExtractor={item => item.kind + item.id}
+        renderItem={renderItem}
         onScroll={handleScrollEnd}
-        scrollEventThrottle={150}
+        scrollEventThrottle={200}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews
         windowSize={10}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <AppText variant="caption">Henüz mesaj yok</AppText>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         onContentSizeChange={() => {
-          if (autoScroll) return;
-          setNewMsgCount(c => c + 1);
+          if (autoScroll) {
+            flatListRef.current?.scrollToEnd({animated: false});
+          } else {
+            setNewMsgCount(c => c + 1);
+          }
         }}
       />
 
@@ -124,27 +233,35 @@ export default function ChatScreen() {
         </TouchableOpacity>
       )}
 
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder="Mesaj yaz..."
-          placeholderTextColor={colors.textSecondary}
-          multiline
-          maxLength={500}
-          returnKeyType="send"
-          onSubmitEditing={handleSend}
-          blurOnSubmit
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!text.trim()}
-          activeOpacity={0.75}>
-          <MaterialIcon name="send" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
+      {user ? (
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="Mesaj yaz..."
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            maxLength={500}
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            blurOnSubmit
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!text.trim()}
+            activeOpacity={0.75}>
+            <MaterialIcon name="send" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.authBar}>
+          <AppText variant="caption" style={styles.authText}>
+            Sohbete katılmak için giriş yapmalısın
+          </AppText>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -167,6 +284,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: 2,
+    flexGrow: 1,
   },
   msgRow: {
     flexDirection: 'row',
@@ -192,6 +310,29 @@ const styles = StyleSheet.create({
   msgText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  ownRow: {
+    alignItems: 'flex-end',
+    paddingVertical: spacing.xs + 1,
+  },
+  ownBubble: {
+    maxWidth: '75%',
+    backgroundColor: 'rgba(188, 2, 45, 0.15)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(188, 2, 45, 0.3)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    gap: 2,
+  },
+  ownTime: {
+    color: colors.textSecondary,
+    textAlign: 'right',
+  },
+  ownText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textPrimary,
   },
   newMsgBanner: {
     flexDirection: 'row',
@@ -241,7 +382,17 @@ const styles = StyleSheet.create({
   sendBtnDisabled: {
     backgroundColor: colors.border,
   },
-  authBanner: {
+  authBar: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    alignItems: 'center',
+  },
+  authText: {
+    color: colors.textSecondary,
+  },
+  empty: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

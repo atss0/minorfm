@@ -7,6 +7,7 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import FlashMessage from 'react-native-flash-message';
 import RootNavigator from './src/navigation/RootNavigator';
 import {linking} from './src/navigation/linking';
+import {navigationRef} from './src/navigation/navigationRef';
 import {initOneSignal} from './src/services/OneSignalService';
 
 const queryClient = new QueryClient({
@@ -32,7 +33,7 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <NavigationContainer linking={linking}>
+          <NavigationContainer ref={navigationRef} linking={linking}>
             <RootNavigator />
             <FlashMessage position="top" />
           </NavigationContainer>

@@ -1,11 +1,12 @@
 import {useEffect, useRef} from 'react';
 import TrackPlayer, {Capability, State, usePlaybackState} from 'react-native-track-player';
 import {useStreamStore} from '../stores/streamStore';
+import {radioApi} from '../api/radio';
 
 const STREAM_URL = __DEV__ ? 'https://stream.minor.fm/stream' : 'https://stream.minor.fm/stream';
 
 export function useStream() {
-  const {setPlaying, setStreamUrl, currentMeta} = useStreamStore();
+  const {setPlaying, setStreamUrl, setMeta, currentMeta} = useStreamStore();
   const playbackState = usePlaybackState();
   const initialized = useRef(false);
 
@@ -49,6 +50,11 @@ export function useStream() {
     };
 
     setup();
+
+    // Stop playback when user logs out (MainScreen unmounts)
+    return () => {
+      TrackPlayer.reset().catch(() => {});
+    };
   }, [setStreamUrl]);
 
   useEffect(() => {
@@ -56,6 +62,26 @@ export function useStream() {
       setPlaying(playbackState.state === State.Playing);
     }
   }, [playbackState.state, setPlaying]);
+
+  // Poll metadata every 30s
+  useEffect(() => {
+    const fetchMeta = async () => {
+      try {
+        const res = await radioApi.getCurrent();
+        const track = res.data?.track;
+        if (track?.title || track?.artist) {
+          setMeta({
+            artist: track.artist ?? '',
+            title: track.title ?? '',
+            cover_url: track.cover_url || undefined,
+          });
+        }
+      } catch {}
+    };
+    fetchMeta();
+    const interval = setInterval(fetchMeta, 30_000);
+    return () => clearInterval(interval);
+  }, [setMeta]);
 
   const togglePlay = async () => {
     if (playbackState.state === State.Playing) {

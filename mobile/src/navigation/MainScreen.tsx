@@ -1,6 +1,8 @@
 import React, {useEffect} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useRoute, RouteProp} from '@react-navigation/native';
+import type {AppStackParamList} from './RootNavigator';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,8 +14,8 @@ import {mainPagerRef} from './pagerRef';
 import PlayerHeader from '../components/PlayerHeader';
 import CustomTabBar from '../components/CustomTabBar';
 import AppText from '../components/AppText';
+import DeckScreen from '../screens/tabs/DeckScreen';
 import ChatScreen from '../screens/tabs/ChatScreen';
-import ListenScreen from '../screens/tabs/ListenScreen';
 import RecScreen from '../screens/tabs/RecScreen';
 import DMScreen from '../screens/tabs/DMScreen';
 import YouScreen from '../screens/tabs/YouScreen';
@@ -22,10 +24,23 @@ import {useNetworkStatus} from '../hooks/useNetworkStatus';
 import {wsManager} from '../services/WebSocketManager';
 import {colors, spacing} from '../theme';
 
+type MainRouteProp = RouteProp<AppStackParamList, 'Main'>;
+
 export default function MainScreen() {
+  const route = useRoute<MainRouteProp>();
   const setTabIndex = useUIStore(s => s.setTabIndex);
   const {isOffline, isReconnecting} = useNetworkStatus();
   const queryClient = useQueryClient();
+
+  // Deep link ile açıldıysa doğru sekmeye git
+  useEffect(() => {
+    const initialTab = route.params?.initialTab;
+    if (initialTab !== undefined) {
+      mainPagerRef.current?.setPage(initialTab);
+      setTabIndex(initialTab);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const bannerHeight = useSharedValue(0);
 
@@ -67,10 +82,10 @@ export default function MainScreen() {
         initialPage={2}
         onPageSelected={e => setTabIndex(e.nativeEvent.position)}>
         <View key="0" style={styles.page}>
-          <ChatScreen />
+          <DeckScreen />
         </View>
         <View key="1" style={styles.page}>
-          <ListenScreen />
+          <ChatScreen />
         </View>
         <View key="2" style={styles.page}>
           <RecScreen />

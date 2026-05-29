@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {
   Alert,
   PermissionsAndroid,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
+  // TouchableOpacity used in recording/preview states
 } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -25,6 +26,7 @@ import DynamicListenerGrid from '../../components/DynamicListenerGrid';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
 import {useAuthStore} from '../../stores/authStore';
+import {useUIStore} from '../../stores/uiStore';
 import {colors, spacing} from '../../theme';
 import {recordingsApi} from '../../api/recordings';
 import {usersApi} from '../../api/users';
@@ -44,6 +46,7 @@ export default function RecScreen() {
   const {height: screenHeight} = useWindowDimensions();
   const queryClient = useQueryClient();
   const {user} = useAuthStore();
+  const {shouldStartRecording, clearStartRecording} = useUIStore();
 
   const [recState, setRecState] = useState<RecState>('idle');
   const [recordedPath, setRecordedPath] = useState<string | null>(null);
@@ -130,6 +133,14 @@ export default function RecScreen() {
       setIsStarting(false);
     }
   }, [pulse, ring, startRecorder]);
+
+  // Tab bar mic button triggers recording when this screen is active
+  useEffect(() => {
+    if (shouldStartRecording && recState === 'idle') {
+      clearStartRecording();
+      handleStartRecording();
+    }
+  }, [shouldStartRecording, recState, clearStartRecording, handleStartRecording]);
 
   const handleStopRecording = useCallback(async () => {
     setIsStopping(true);
@@ -261,18 +272,12 @@ export default function RecScreen() {
 
       <DynamicListenerGrid
         listeners={listeners}
-        maxHeight={screenHeight * 0.55}
+        maxHeight={screenHeight * 0.7}
       />
 
-      <View style={styles.recordSection}>
-        <TouchableOpacity
-          style={styles.recordButton}
-          onPress={handleStartRecording}
-          disabled={isStarting}
-          activeOpacity={0.85}>
-          <MaterialIcon name="mic" size={30} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <AppText style={styles.recordHint}>Kayıt yapmak için dokun</AppText>
+      <View style={styles.recordHintSection}>
+        <MaterialIcon name="mic" size={16} color={colors.textSecondary} />
+        <AppText style={styles.recordHint}>Kayıt başlatmak için aşağıdaki mic butonuna bas</AppText>
       </View>
     </View>
   );
@@ -295,23 +300,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
-  recordSection: {
+  recordHintSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
-    gap: spacing.sm,
-  },
-  recordButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
   },
   recordHint: {
     fontSize: 12,

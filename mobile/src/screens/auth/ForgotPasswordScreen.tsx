@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,6 +16,7 @@ import {authApi} from '../../api/auth';
 import {colors, spacing} from '../../theme';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
+import Logo from '../../components/Logo';
 import type {AuthStackParamList} from '../../navigation/RootNavigator';
 
 const schema = z.object({
@@ -45,8 +47,15 @@ export default function ForgotPasswordScreen({navigation}: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={styles.container}>
+      behavior="padding">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.logoWrap}>
+          <Logo height={28} />
+        </View>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
           <Text style={styles.backText}>← Geri</Text>
         </TouchableOpacity>
@@ -95,17 +104,19 @@ export default function ForgotPasswordScreen({navigation}: Props) {
             />
           </>
         )}
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: {flex: 1, backgroundColor: colors.bg},
+  logoWrap: {alignItems: 'center', marginBottom: spacing.xl},
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
   },
   back: {marginBottom: spacing.xl},
   backText: {color: colors.textSecondary, fontSize: 15},

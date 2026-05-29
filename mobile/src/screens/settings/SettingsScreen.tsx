@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {launchImageLibrary} from 'react-native-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import {showMessage} from 'react-native-flash-message';
 import {useMutation} from '@tanstack/react-query';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
@@ -57,16 +57,27 @@ export default function SettingsScreen() {
   });
 
   const handleAvatarPick = async () => {
-    const result = await launchImageLibrary({mediaType: 'photo', quality: 0.8});
-    const asset = result.assets?.[0];
-    if (!asset?.uri) {
+    let image;
+    try {
+      image = await ImageCropPicker.openPicker({
+        width: 400,
+        height: 400,
+        cropping: true,
+        cropperCircleOverlay: false,
+        mediaType: 'photo',
+        compressImageQuality: 0.8,
+        cropperToolbarTitle: 'Fotoğrafı Kırp',
+        cropperChooseText: 'Seç',
+        cropperCancelText: 'İptal',
+      });
+    } catch {
       return;
     }
     const formData = new FormData();
     formData.append('avatar', {
-      uri: asset.uri,
-      type: asset.type ?? 'image/jpeg',
-      name: asset.fileName ?? 'avatar.jpg',
+      uri: image.path,
+      type: image.mime ?? 'image/jpeg',
+      name: 'avatar.jpg',
     } as unknown as Blob);
     try {
       const res = await mediaApi.uploadAvatar(formData);

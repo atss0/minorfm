@@ -15,7 +15,6 @@ export function useBroadcastChat() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnect = useRef(true);
 
-  // Fetch broadcast room on mount
   useEffect(() => {
     chatApi
       .getRooms()
@@ -24,9 +23,7 @@ export function useBroadcastChat() {
         const broadcastRoom = rooms.find(
           (r: {type: string; id: string}) => r.type === 'broadcast',
         );
-        if (broadcastRoom) {
-          setRoomId(broadcastRoom.id);
-        }
+        if (broadcastRoom) setRoomId(broadcastRoom.id);
       })
       .catch(() => {});
   }, [setRoomId]);
@@ -42,9 +39,24 @@ export function useBroadcastChat() {
       );
       ws.current = socket;
 
-      socket.onopen = () => {
+      socket.onopen = async () => {
         setConnected(true);
         reconnectAttempt.current = 0;
+        // Load recent history on (re)connect
+        try {
+          const res = await chatApi.getMessages(broadcastRoomId);
+          const history: any[] = res.data?.data ?? [];
+          setMessages(
+            history.map(m => ({
+              id: m.id,
+              roomId: m.room_id,
+              userId: m.user_id,
+              user: m.user ?? {username: m.username ?? '', avatar_url: m.avatar_url ?? ''},
+              body: m.body,
+              createdAt: m.created_at,
+            })),
+          );
+        } catch {}
       };
 
       socket.onclose = () => {
@@ -57,11 +69,21 @@ export function useBroadcastChat() {
 
       socket.onerror = () => socket.close();
 
+      // Backend broadcasts raw OutgoingMessage (no type wrapper):
+      // {id, room_id, user_id, username, avatar_url, body, created_at}
       socket.onmessage = event => {
         try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'message') addMessage(msg.data);
-          else if (msg.type === 'history') setMessages(msg.data);
+          const raw = JSON.parse(event.data);
+          if (raw.id && raw.body) {
+            addMessage({
+              id: raw.id,
+              roomId: raw.room_id,
+              userId: raw.user_id,
+              user: {username: raw.username, avatar_url: raw.avatar_url},
+              body: raw.body,
+              createdAt: raw.created_at,
+            });
+          }
         } catch {}
       };
     };
@@ -76,14 +98,11 @@ export function useBroadcastChat() {
     };
   }, [broadcastRoomId, accessToken, setConnected, addMessage, setMessages]);
 
-  const sendMessage = useCallback(
-    (body: string) => {
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({type: 'message', body}));
-      }
-    },
-    [],
-  );
+  const sendMessage = useCallback((body: string) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({body}));
+    }
+  }, []);
 
   return {messages, isConnected, sendMessage};
 }

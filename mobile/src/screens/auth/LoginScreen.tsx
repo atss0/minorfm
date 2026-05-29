@@ -20,6 +20,7 @@ import {colors, spacing} from '../../theme';
 import Input from '../../components/Input';
 import PasswordInput from '../../components/PasswordInput';
 import Button from '../../components/Button';
+import Logo from '../../components/Logo';
 import type {AuthStackParamList} from '../../navigation/RootNavigator';
 
 const schema = z.object({
@@ -57,13 +58,16 @@ export default function LoginScreen({navigation}: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      behavior="padding">
       <ScrollView
         contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled">
-        {/* Logo */}
-        <Text style={styles.logo}>MINOR.fm</Text>
-        <Text style={styles.subtitle}>müzik kültürü platformu</Text>
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.logoWrap}>
+          <Logo height={30} />
+        </View>
+        <Text style={styles.subtitle}>Hesabına giriş yap</Text>
 
         <View style={styles.form}>
           <Controller
@@ -130,13 +134,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xxl,
   },
-  logo: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.primary,
-    textAlign: 'center',
-    letterSpacing: 1,
-  },
+  logoWrap: {alignItems: 'center'},
   subtitle: {
     fontSize: 13,
     color: colors.textSecondary,
