@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import {Image, StyleSheet, Text, View, ViewStyle} from 'react-native';
 import {colors} from '../theme';
 import {getInitials} from '../utils/format';
@@ -11,45 +11,37 @@ interface Props {
 }
 
 export default function Avatar({uri, username, size = 40, style}: Props) {
-  const [failed, setFailed] = useState(false);
   const borderRadius = size / 2;
-
-  useEffect(() => {
-    setFailed(false);
-  }, [uri]);
-
-  if (uri && !failed) {
-    return (
-      <Image
-        source={{uri}}
-        style={[{width: size, height: size, borderRadius}, style]}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-      />
-    );
-  }
 
   return (
     <View
       style={[
-        styles.fallback,
+        styles.container,
         {width: size, height: size, borderRadius},
         style,
       ]}>
       <Text style={[styles.initials, {fontSize: size * 0.38}]}>
         {getInitials(username)}
       </Text>
+      {!!uri && (
+        <Image
+          source={{uri}}
+          style={[StyleSheet.absoluteFill, {borderRadius}]}
+          resizeMode="cover"
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fallback: {
+  container: {
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
   },
   initials: {
     color: colors.textPrimary,
