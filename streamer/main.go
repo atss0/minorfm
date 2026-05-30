@@ -83,7 +83,15 @@ func main() {
 	}
 
 	q = LoadQueue()
+
+	// If queue is empty on startup, auto-populate from the uploads dir so
+	// the stream resumes without manual intervention after a container restart.
+	if q.Len() == 0 {
+		autoPopulateQueue(q)
+	}
+
 	bc = NewBroadcaster(q)
+	bc.SetLoop(true)
 	go bc.Run()
 
 	mux := http.NewServeMux()
@@ -251,6 +259,33 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// autoPopulateQueue scans the uploads directory and adds all audio files to the
+// queue. Called on startup when the queue is empty (e.g. after container restart).
+func autoPopulateQueue(q *Queue) {
+	entries, err := os.ReadDir(uploadDir)
+	if err != nil {
+		return
+	}
+	allowed := map[string]bool{".mp3": true, ".ogg": true, ".flac": true, ".wav": true, ".m4a": true, ".aac": true, ".opus": true}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		if !allowed[ext] {
+			continue
+		}
+		id := strings.TrimSuffix(name, filepath.Ext(name))
+		title := id
+		source := filepath.Join(uploadDir, name)
+		if _, err := q.Add(Track{ID: id, Title: title, Source: source, IsFile: false}); err != nil {
+			log.Printf("autoPopulate: could not add %s: %v", name, err)
+		}
+	}
+	log.Printf("autoPopulate: added %d tracks to queue", q.Len())
 }
 
 // ── Now (public metadata) ─────────────────────────────────────────────────────

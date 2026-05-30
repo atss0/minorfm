@@ -26,7 +26,7 @@ type Queue struct {
 	tracks []Track
 }
 
-const queueFile = "./queue.json"
+const queueFile = "./uploads/queue.json"
 
 func newID() string {
 	b := make([]byte, 8)
