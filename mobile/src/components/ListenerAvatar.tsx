@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect} from 'react';
-import {Pressable, StyleSheet} from 'react-native';
+import {StyleSheet, TouchableOpacity} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -116,7 +116,7 @@ export default React.memo(function ListenerAvatar({
   const iconSize = Math.round(size * 0.44);
 
   return (
-    <Pressable onPress={handlePress} onLongPress={onLongPress} android_ripple={null}>
+    <TouchableOpacity onPress={handlePress} onLongPress={onLongPress} activeOpacity={0.8}>
       <Animated.View style={[styles.wrapper, wrapperStyle]}>
         <Avatar
           uri={listener.avatar_url}
@@ -146,7 +146,7 @@ export default React.memo(function ListenerAvatar({
           </Animated.View>
         </Animated.View>
       </Animated.View>
-    </Pressable>
+    </TouchableOpacity>
   );
 });
 
