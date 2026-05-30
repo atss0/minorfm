@@ -107,7 +107,7 @@ func Setup(app *fiber.App, db *gorm.DB, rdb *redis.Client, cfg *config.Config) {
 	// users
 	users := api.Group("/users")
 	users.Get("/online", h.GetOnlineUsers)
-	users.Get("/:username", h.GetProfile)
+	users.Get("/:username", middleware.JWTOptional(cfg), h.GetProfile)
 	users.Put("/me", protected, h.UpdateMe)
 	users.Put("/me/password", protected, h.UpdatePassword)
 	users.Post("/:id/follow", protected, h.FollowUser)

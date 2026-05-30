@@ -60,8 +60,10 @@ export default function ProfileScreen() {
 
   const followMutation = useMutation({
     mutationFn: () => usersApi.follow(profileData!.id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({queryKey: ['profile', params.username]}),
+    onSuccess: () => {
+      // Invalidate so follower count + is_following refresh from server
+      queryClient.invalidateQueries({queryKey: ['profile', params.username]});
+    },
   });
 
   const handleDM = async () => {

@@ -25,6 +25,18 @@ func (h *Handler) GetProfile(c *fiber.Ctx) error {
 	h.DB.Model(&models.Follow{}).Where("following_id = ?", user.ID).Count(&followerCount)
 	h.DB.Model(&models.Follow{}).Where("follower_id = ?", user.ID).Count(&followingCount)
 
+	isFollowing := false
+	if requesterID, ok := c.Locals("userID").(string); ok && requesterID != "" {
+		rid, err := uuid.Parse(requesterID)
+		if err == nil {
+			var count int64
+			h.DB.Model(&models.Follow{}).
+				Where("follower_id = ? AND following_id = ?", rid, user.ID).
+				Count(&count)
+			isFollowing = count > 0
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"id":              user.ID,
 		"username":        user.Username,
@@ -36,6 +48,7 @@ func (h *Handler) GetProfile(c *fiber.Ctx) error {
 		"post_count":      postCount,
 		"follower_count":  followerCount,
 		"following_count": followingCount,
+		"is_following":    isFollowing,
 	})
 }
 

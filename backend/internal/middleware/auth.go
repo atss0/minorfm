@@ -14,6 +14,32 @@ import (
 	"gorm.io/gorm"
 )
 
+// JWTOptional reads the bearer token if present and sets userID in locals,
+// but never rejects the request — unauthenticated users just have no userID.
+func JWTOptional(cfg *config.Config) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		authHeader := c.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			return c.Next()
+		}
+		tokenStr := authHeader[7:]
+		claims := &jwt.MapClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fiber.ErrUnauthorized
+			}
+			return []byte(cfg.JWTSecret), nil
+		})
+		if err != nil || !token.Valid {
+			return c.Next()
+		}
+		if userID, ok := (*claims)["sub"].(string); ok {
+			c.Locals("userID", userID)
+		}
+		return c.Next()
+	}
+}
+
 func JWTProtected(cfg *config.Config, rdb *redis.Client, db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
