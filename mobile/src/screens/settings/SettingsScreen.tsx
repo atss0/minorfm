@@ -10,7 +10,7 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import {showMessage} from 'react-native-flash-message';
-import {useMutation} from '@tanstack/react-query';
+import {useMutation, useQueryClient} from '@tanstack/react-query';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import {useAuthStore} from '../../stores/authStore';
 import {usersApi} from '../../api/users';
@@ -23,6 +23,7 @@ import {colors, spacing, radius} from '../../theme';
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const {user, updateUser, logout} = useAuthStore();
+  const queryClient = useQueryClient();
 
   const [username, setUsername] = useState(user?.username ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -84,6 +85,7 @@ export default function SettingsScreen() {
       const avatarUrl = res.data?.avatar_url ?? res.data?.url;
       if (avatarUrl) {
         updateUser({avatar_url: avatarUrl});
+        queryClient.invalidateQueries({queryKey: ['profile', user?.username]});
         showMessage({message: 'Profil fotoğrafı güncellendi', type: 'success'});
       }
     } catch {
