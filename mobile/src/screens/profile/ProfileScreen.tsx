@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -17,6 +17,7 @@ import {dmApi} from '../../api/dm';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
+import FollowListModal from '../../components/FollowListModal';
 import {colors, spacing} from '../../theme';
 import type {AppStackParamList} from '../../navigation/RootNavigator';
 
@@ -28,6 +29,9 @@ export default function ProfileScreen() {
   const {params} = useRoute<Route>();
   const queryClient = useQueryClient();
   const {user: me} = useAuthStore();
+
+  const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
+  const [followModalVisible, setFollowModalVisible] = useState(false);
 
   const {data: profileData, isLoading} = useQuery({
     queryKey: ['profile', params.username],
@@ -50,6 +54,11 @@ export default function ProfileScreen() {
         name: params.username,
       });
     } catch {}
+  };
+
+  const openFollowModal = (type: 'followers' | 'following') => {
+    setFollowModalType(type);
+    setFollowModalVisible(true);
   };
 
   const isOwnProfile = me?.username === params.username;
@@ -90,24 +99,25 @@ export default function ProfileScreen() {
             ) : null}
 
             <View style={styles.stats}>
-              <View style={styles.statItem}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={() => openFollowModal('followers')}
+                activeOpacity={0.7}>
                 <AppText variant="subheading">
                   {profileData?.followers_count ?? 0}
                 </AppText>
                 <AppText variant="caption">Takipçi</AppText>
-              </View>
+              </TouchableOpacity>
               <View style={styles.statDivider} />
-              <View style={styles.statItem}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={() => openFollowModal('following')}
+                activeOpacity={0.7}>
                 <AppText variant="subheading">
                   {profileData?.following_count ?? 0}
                 </AppText>
                 <AppText variant="caption">Takip</AppText>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <AppText variant="subheading">{userRecordings.length}</AppText>
-                <AppText variant="caption">Kayıt</AppText>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {!isOwnProfile && (
@@ -129,9 +139,16 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
-
         </ScrollView>
       )}
+
+      <FollowListModal
+        visible={followModalVisible}
+        userId={profileData?.id ?? ''}
+        type={followModalType}
+        onClose={() => setFollowModalVisible(false)}
+        onUserPress={username => navigation.push('Profile', {username})}
+      />
     </View>
   );
 }

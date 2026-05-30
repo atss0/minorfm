@@ -10,7 +10,7 @@ import {colors, spacing} from '../theme';
 
 // Deck=0, Chat=1, Rec=2(center), DM=3, Profile=4
 const TAB_ITEMS = [
-  {index: 0, icon: 'radio'},
+  {index: 0, icon: 'headset'},
   {index: 1, icon: 'chat'},
   {index: 2, icon: 'mic'},
   {index: 3, icon: 'mail'},

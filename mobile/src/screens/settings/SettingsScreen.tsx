@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -19,6 +18,7 @@ import {mediaApi} from '../../api/media';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
+import CustomAlert from '../../components/CustomAlert';
 import {colors, spacing, radius} from '../../theme';
 
 export default function SettingsScreen() {
@@ -31,6 +31,7 @@ export default function SettingsScreen() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [logoutAlertVisible, setLogoutAlertVisible] = useState(false);
 
   const profileMutation = useMutation({
     mutationFn: () =>
@@ -99,12 +100,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Çıkış', 'Çıkış yapmak istediğine emin misin?', [
-      {text: 'İptal', style: 'cancel'},
-      {text: 'Çıkış Yap', style: 'destructive', onPress: logout},
-    ]);
-  };
+  const handleLogout = () => setLogoutAlertVisible(true);
 
   return (
     <View style={styles.root}>
@@ -233,6 +229,17 @@ export default function SettingsScreen() {
           <Button label="Çıkış Yap" variant="danger" onPress={handleLogout} />
         </View>
       </ScrollView>
+
+      <CustomAlert
+        visible={logoutAlertVisible}
+        title="Çıkış"
+        message="Çıkış yapmak istediğine emin misin?"
+        buttons={[
+          {text: 'İptal', style: 'cancel', onPress: () => setLogoutAlertVisible(false)},
+          {text: 'Çıkış Yap', style: 'destructive', onPress: () => { setLogoutAlertVisible(false); logout(); }},
+        ]}
+        onRequestClose={() => setLogoutAlertVisible(false)}
+      />
     </View>
   );
 }

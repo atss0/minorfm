@@ -26,6 +26,7 @@ interface Props {
   listener: Listener;
   size: number;
   isSuperliked?: boolean;
+  heartTapType?: 'heart' | 'clap' | null;
   onPress?: () => void;
   onLongPress?: () => void;
 }
@@ -34,6 +35,7 @@ export default React.memo(function ListenerAvatar({
   listener,
   size,
   isSuperliked = false,
+  heartTapType = null,
   onPress,
   onLongPress,
 }: Props) {
@@ -48,8 +50,14 @@ export default React.memo(function ListenerAvatar({
       navigation.navigate('Profile', {username: listener.username});
     }
   }, [onPress, navigation, listener.username]);
-  const heartScale = useSharedValue(0);
-  const heartOpacity = useSharedValue(0);
+
+  // Superlike overlay (long-press): static bg, only icon scales
+  const superlikeOverlayOpacity = useSharedValue(0);
+  const superlikeIconScale = useSharedValue(0);
+
+  // Heart-tap overlay (double-tap broadcast): static bg, only emoji scales
+  const tapOverlayOpacity = useSharedValue(0);
+  const tapIconScale = useSharedValue(0);
 
   useEffect(() => {
     sizeShared.value = withTiming(size, {duration: 250});
@@ -58,19 +66,31 @@ export default React.memo(function ListenerAvatar({
 
   useEffect(() => {
     if (isSuperliked) {
-      // Pop in: scale 0 → 1.2 → 1 with full opacity
-      heartOpacity.value = withTiming(1, {duration: 60});
-      heartScale.value = withSequence(
-        withSpring(1.2, {damping: 6, stiffness: 300}),
+      superlikeOverlayOpacity.value = withTiming(1, {duration: 60});
+      superlikeIconScale.value = withSequence(
+        withSpring(1.3, {damping: 6, stiffness: 300}),
         withSpring(1, {damping: 10, stiffness: 200}),
       );
     } else {
-      // Fade out smoothly
-      heartOpacity.value = withTiming(0, {duration: 350});
-      heartScale.value = withDelay(100, withTiming(0, {duration: 250}));
+      superlikeOverlayOpacity.value = withTiming(0, {duration: 350});
+      superlikeIconScale.value = withDelay(100, withTiming(0, {duration: 250}));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperliked]);
+
+  useEffect(() => {
+    if (heartTapType) {
+      tapOverlayOpacity.value = withTiming(1, {duration: 80});
+      tapIconScale.value = withSequence(
+        withSpring(1.4, {damping: 5, stiffness: 280}),
+        withSpring(1, {damping: 12, stiffness: 200}),
+      );
+    } else {
+      tapOverlayOpacity.value = withTiming(0, {duration: 400});
+      tapIconScale.value = withDelay(150, withTiming(0, {duration: 250}));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heartTapType]);
 
   const wrapperStyle = useAnimatedStyle(() => ({
     width: sizeShared.value,
@@ -78,9 +98,20 @@ export default React.memo(function ListenerAvatar({
     borderRadius: sizeShared.value / 2,
   }));
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    transform: [{scale: heartScale.value}],
-    opacity: heartOpacity.value,
+  const superlikeOverlayStyle = useAnimatedStyle(() => ({
+    opacity: superlikeOverlayOpacity.value,
+  }));
+
+  const superlikeIconStyle = useAnimatedStyle(() => ({
+    transform: [{scale: superlikeIconScale.value}],
+  }));
+
+  const tapOverlayStyle = useAnimatedStyle(() => ({
+    opacity: tapOverlayOpacity.value,
+  }));
+
+  const tapIconStyle = useAnimatedStyle(() => ({
+    transform: [{scale: tapIconScale.value}],
   }));
 
   const iconSize = Math.round(size * 0.44);
@@ -94,8 +125,26 @@ export default React.memo(function ListenerAvatar({
           size={size}
           style={styles.avatar}
         />
-        <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, overlayStyle]}>
-          <MaterialIcon name="favorite" size={iconSize} color={colors.textPrimary} />
+        {/* Superlike overlay — static bg, animated icon only */}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, superlikeOverlayStyle]}>
+          <Animated.View style={superlikeIconStyle}>
+            <MaterialIcon name="favorite" size={iconSize} color={colors.textPrimary} />
+          </Animated.View>
+        </Animated.View>
+        {/* Heart-tap overlay — static bg, animated icon only */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            heartTapType === 'clap' ? styles.clapOverlay : styles.overlay,
+            tapOverlayStyle,
+          ]}>
+          <Animated.View style={tapIconStyle}>
+            <MaterialIcon
+              name={heartTapType === 'clap' ? 'thumb-up' : 'favorite'}
+              size={iconSize}
+              color={colors.textPrimary}
+            />
+          </Animated.View>
         </Animated.View>
       </Animated.View>
     </TouchableOpacity>
@@ -113,6 +162,11 @@ const styles = StyleSheet.create({
   },
   overlay: {
     backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  clapOverlay: {
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
   },

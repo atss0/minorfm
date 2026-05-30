@@ -20,31 +20,35 @@ const (
 )
 
 type incomingMessage struct {
-	Body string `json:"body"`
+	Type   string `json:"type"`   // "heart_tap" or empty (chat message)
+	Body   string `json:"body"`
+	Effect string `json:"effect"` // "heart" or "clap" (for heart_tap)
 }
 
 // Client represents a single WebSocket connection.
 type Client struct {
-	hub       *Hub
-	conn      *websocket.Conn
-	send      chan []byte
-	roomID    string
-	userID    string
-	username  string
-	avatarURL string
-	rdb       *redis.Client
+	hub         *Hub
+	conn        *websocket.Conn
+	send        chan []byte
+	roomID      string
+	userID      string
+	username    string
+	avatarURL   string
+	rdb         *redis.Client
+	isBroadcast bool
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, rdb *redis.Client, roomID, userID, username, avatarURL string) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, rdb *redis.Client, roomID, userID, username, avatarURL string, isBroadcast bool) *Client {
 	return &Client{
-		hub:       hub,
-		conn:      conn,
-		send:      make(chan []byte, 256),
-		roomID:    roomID,
-		userID:    userID,
-		username:  username,
-		avatarURL: avatarURL,
-		rdb:       rdb,
+		hub:         hub,
+		conn:        conn,
+		send:        make(chan []byte, 256),
+		roomID:      roomID,
+		userID:      userID,
+		username:    username,
+		avatarURL:   avatarURL,
+		rdb:         rdb,
+		isBroadcast: isBroadcast,
 	}
 }
 
@@ -58,7 +62,15 @@ func (c *Client) Run() {
 		Score:  float64(time.Now().Unix()),
 		Member: c.userID,
 	})
+	if c.isBroadcast {
+		if err := c.hub.PublishPresence(c.roomID, "join", c.userID, c.username, c.avatarURL); err != nil {
+			log.Printf("ws: presence join error: %v", err)
+		}
+	}
 	defer func() {
+		if c.isBroadcast {
+			_ = c.hub.PublishPresence(c.roomID, "leave", c.userID, c.username, c.avatarURL)
+		}
 		c.hub.RemoveClient(c)
 		c.rdb.ZRem(context.Background(), onlineUsersKey, c.userID)
 	}()
@@ -84,10 +96,7 @@ func (c *Client) readPump() {
 		}
 
 		var msg incomingMessage
-		if err := json.Unmarshal(raw, &msg); err != nil || msg.Body == "" {
-			continue
-		}
-		if len(msg.Body) > 500 {
+		if err := json.Unmarshal(raw, &msg); err != nil {
 			continue
 		}
 
@@ -95,8 +104,22 @@ func (c *Client) readPump() {
 			continue
 		}
 
-		if err := c.hub.SaveAndPublish(c.roomID, c.userID, c.username, c.avatarURL, msg.Body); err != nil {
-			log.Printf("ws: publish error: %v", err)
+		switch msg.Type {
+		case "heart_tap":
+			effect := msg.Effect
+			if effect != "clap" {
+				effect = "heart"
+			}
+			if err := c.hub.PublishHeartTap(c.roomID, c.userID, c.username, c.avatarURL, effect); err != nil {
+				log.Printf("ws: heart_tap publish error: %v", err)
+			}
+		default:
+			if msg.Body == "" || len(msg.Body) > 500 {
+				continue
+			}
+			if err := c.hub.SaveAndPublish(c.roomID, c.userID, c.username, c.avatarURL, msg.Body); err != nil {
+				log.Printf("ws: publish error: %v", err)
+			}
 		}
 	}
 }

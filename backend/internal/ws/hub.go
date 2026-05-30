@@ -24,6 +24,24 @@ type OutgoingMessage struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// OutgoingHeartTap is broadcast when a user sends a heart_tap event.
+type OutgoingHeartTap struct {
+	Type      string `json:"type"`
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	AvatarURL string `json:"avatar_url"`
+	Effect    string `json:"effect"` // "heart" or "clap"
+}
+
+// OutgoingPresence is broadcast when a user joins or leaves the broadcast room.
+type OutgoingPresence struct {
+	Type      string `json:"type"`
+	Action    string `json:"action"` // "join" or "leave"
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	AvatarURL string `json:"avatar_url"`
+}
+
 // Hub manages all WebSocket rooms and their Redis Pub/Sub subscriptions.
 type Hub struct {
 	mu    sync.RWMutex
@@ -103,6 +121,38 @@ func (h *Hub) SaveAndPublish(roomID, userID, username, avatarURL, body string) e
 		CreatedAt: msg.CreatedAt,
 	}
 
+	data, err := json.Marshal(out)
+	if err != nil {
+		return err
+	}
+	return h.rdb.Publish(context.Background(), "chat:"+roomID, string(data)).Err()
+}
+
+// PublishPresence broadcasts a join/leave event to all clients in the room.
+func (h *Hub) PublishPresence(roomID, action, userID, username, avatarURL string) error {
+	out := &OutgoingPresence{
+		Type:      "presence",
+		Action:    action,
+		UserID:    userID,
+		Username:  username,
+		AvatarURL: avatarURL,
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		return err
+	}
+	return h.rdb.Publish(context.Background(), "chat:"+roomID, string(data)).Err()
+}
+
+// PublishHeartTap broadcasts a heart_tap event to all clients in the room (no DB write).
+func (h *Hub) PublishHeartTap(roomID, userID, username, avatarURL, effect string) error {
+	out := &OutgoingHeartTap{
+		Type:      "heart_tap",
+		UserID:    userID,
+		Username:  username,
+		AvatarURL: avatarURL,
+		Effect:    effect,
+	}
 	data, err := json.Marshal(out)
 	if err != nil {
 		return err

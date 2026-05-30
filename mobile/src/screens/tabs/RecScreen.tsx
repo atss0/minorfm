@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useMemo} from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   PermissionsAndroid,
   Platform,
@@ -23,16 +22,16 @@ import HapticFeedback from 'react-native-haptic-feedback';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useQuery, useQueryClient} from '@tanstack/react-query';
+import {useQueryClient} from '@tanstack/react-query';
 import {showMessage} from 'react-native-flash-message';
 import DynamicListenerGrid from '../../components/DynamicListenerGrid';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
 import {useAuthStore} from '../../stores/authStore';
 import {useUIStore} from '../../stores/uiStore';
+import {useChatStore} from '../../stores/chatStore';
 import {colors, spacing} from '../../theme';
 import {recordingsApi} from '../../api/recordings';
-import {usersApi} from '../../api/users';
 import {navigateToTab} from '../../navigation/pagerRef';
 import {useState} from 'react';
 import type {AppStackParamList} from '../../navigation/RootNavigator';
@@ -57,6 +56,7 @@ export default function RecScreen() {
   const queryClient = useQueryClient();
   const {user} = useAuthStore();
   const {shouldStartRecording, clearStartRecording} = useUIStore();
+  const onlineUsers = useChatStore(s => s.onlineUsers);
 
   const [recState, setRecState] = useState<RecState>('idle');
   const [recordedPath, setRecordedPath] = useState<string | null>(null);
@@ -66,22 +66,13 @@ export default function RecScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [title, setTitle] = useState('');
 
-  // Real online users — refetch every 30s
-  const {data: onlineData} = useQuery({
-    queryKey: ['online-users'],
-    queryFn: () => usersApi.getOnline().then(r => r.data),
-    refetchInterval: 30_000,
-  });
-
   // Always include the current user at the top of the grid
   const listeners = useMemo(() => {
-    const base: {id: string; username: string; avatar_url?: string | null}[] =
-      Array.isArray(onlineData) ? onlineData : [];
-    if (!user) return base;
-    const alreadyIn = base.some(l => l.id === user.id);
-    if (alreadyIn) return base;
-    return [{id: user.id, username: user.username, avatar_url: user.avatar_url}, ...base];
-  }, [onlineData, user]);
+    if (!user) return onlineUsers;
+    const alreadyIn = onlineUsers.some(l => l.id === user.id);
+    if (alreadyIn) return onlineUsers;
+    return [{id: user.id, username: user.username, avatar_url: user.avatar_url}, ...onlineUsers];
+  }, [onlineUsers, user]);
 
   const pulse = useSharedValue(1);
   const ring = useSharedValue(1);
@@ -126,7 +117,7 @@ export default function RecScreen() {
   const handleStartRecording = useCallback(async () => {
     const granted = await requestMic();
     if (!granted) {
-      Alert.alert('İzin Gerekli', 'Mikrofon izni olmadan kayıt yapılamaz.');
+      showMessage({message: 'Mikrofon izni olmadan kayıt yapılamaz.', type: 'warning'});
       return;
     }
     setIsStarting(true);
@@ -138,7 +129,7 @@ export default function RecScreen() {
       HapticFeedback.trigger('notificationSuccess', {enableVibrateFallback: true, ignoreAndroidSystemSettings: false});
     } catch {
       HapticFeedback.trigger('notificationError', {enableVibrateFallback: true, ignoreAndroidSystemSettings: false});
-      Alert.alert('Hata', 'Kayıt başlatılamadı.');
+      showMessage({message: 'Kayıt başlatılamadı.', type: 'danger'});
     } finally {
       setIsStarting(false);
     }
@@ -165,7 +156,7 @@ export default function RecScreen() {
       HapticFeedback.trigger('notificationSuccess', {enableVibrateFallback: true, ignoreAndroidSystemSettings: false});
     } catch {
       HapticFeedback.trigger('notificationError', {enableVibrateFallback: true, ignoreAndroidSystemSettings: false});
-      Alert.alert('Hata', 'Kayıt durdurulamadı.');
+      showMessage({message: 'Kayıt durdurulamadı.', type: 'danger'});
       setRecState('idle');
     } finally {
       setIsStopping(false);
@@ -205,7 +196,7 @@ export default function RecScreen() {
       navigateToTab(1);
     } catch {
       HapticFeedback.trigger('notificationError', {enableVibrateFallback: true, ignoreAndroidSystemSettings: false});
-      Alert.alert('Hata', 'Kayıt gönderilemedi. Tekrar dene.');
+      showMessage({message: 'Kayıt gönderilemedi. Tekrar dene.', type: 'danger'});
     } finally {
       setIsUploading(false);
     }

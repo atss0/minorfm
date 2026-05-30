@@ -1,6 +1,5 @@
-import React, {useCallback} from 'react';
+import React, {useCallback, useState} from 'react';
 import {
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -11,6 +10,7 @@ import {showMessage} from 'react-native-flash-message';
 import RecordingCard from '../../components/RecordingCard';
 import Skeleton from '../../components/Skeleton';
 import AppText from '../../components/AppText';
+import CustomAlert from '../../components/CustomAlert';
 import {useAuthStore} from '../../stores/authStore';
 import {useRecordingsStore} from '../../stores/recordingsStore';
 import {colors, spacing} from '../../theme';
@@ -35,6 +35,7 @@ export default function ListenScreen() {
   const {play, pause, resume} = useRecordingsAudio();
   const {user} = useAuthStore();
   const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const {data: recordingsData, isLoading, refetch, isRefetching} = useQuery({
     queryKey: ['recordings'],
@@ -66,22 +67,7 @@ export default function ListenScreen() {
   const handleLongPress = useCallback(
     (recording: RecordingItem) => {
       if (user?.id !== recording.user_id) return;
-      Alert.alert('Kaydı Sil', 'Bu kaydı silmek istediğinden emin misin?', [
-        {text: 'İptal', style: 'cancel'},
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await recordingsApi.delete(recording.id);
-              await queryClient.invalidateQueries({queryKey: ['recordings']});
-              showMessage({message: 'Kayıt silindi', type: 'success'});
-            } catch {
-              showMessage({message: 'Kayıt silinemedi', type: 'danger'});
-            }
-          },
-        },
-      ]);
+      setDeleteTarget(recording.id);
     },
     [queryClient, user?.id],
   );
@@ -131,6 +117,30 @@ export default function ListenScreen() {
         removeClippedSubviews
         windowSize={10}
         contentContainerStyle={recordings.length === 0 ? {flexGrow: 1} : undefined}
+      />
+      <CustomAlert
+        visible={deleteTarget !== null}
+        title="Kaydı Sil"
+        message="Bu kaydı silmek istediğinden emin misin?"
+        buttons={[
+          {text: 'İptal', style: 'cancel', onPress: () => setDeleteTarget(null)},
+          {
+            text: 'Sil',
+            style: 'destructive',
+            onPress: async () => {
+              const id = deleteTarget!;
+              setDeleteTarget(null);
+              try {
+                await recordingsApi.delete(id);
+                await queryClient.invalidateQueries({queryKey: ['recordings']});
+                showMessage({message: 'Kayıt silindi', type: 'success'});
+              } catch {
+                showMessage({message: 'Kayıt silinemedi', type: 'danger'});
+              }
+            },
+          },
+        ]}
+        onRequestClose={() => setDeleteTarget(null)}
       />
     </View>
   );

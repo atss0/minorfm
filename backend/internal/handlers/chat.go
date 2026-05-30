@@ -73,7 +73,13 @@ func (h *Handler) ChatWS(hub *ws.Hub) fiber.Handler {
 			return
 		}
 
-		client := ws.NewClient(hub, c, h.RDB, roomID, userID, user.Username, user.AvatarURL)
+		var room models.ChatRoom
+		isBroadcast := false
+		if err := h.DB.Select("type").Where("id = ?", roomID).First(&room).Error; err == nil {
+			isBroadcast = room.Type == "broadcast"
+		}
+
+		client := ws.NewClient(hub, c, h.RDB, roomID, userID, user.Username, user.AvatarURL, isBroadcast)
 		client.Run()
 	})
 }

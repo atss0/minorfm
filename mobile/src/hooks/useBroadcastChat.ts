@@ -2,6 +2,8 @@ import {useEffect, useRef, useCallback} from 'react';
 import {useChatStore} from '../stores/chatStore';
 import {useAuthStore} from '../stores/authStore';
 import {chatApi} from '../api/chat';
+import {usersApi} from '../api/users';
+import {heartTapBridge} from '../utils/heartTapBridge';
 import NetInfo from '@react-native-community/netinfo';
 
 const BASE_WS = 'wss://api.minor.fm';
@@ -11,8 +13,12 @@ const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
 const CONNECT_TIMEOUT_MS = 8000;
 
 export function useBroadcastChat() {
-  const {messages, broadcastRoomId, isConnected, setMessages, setRoomId, setConnected, addMessage} =
-    useChatStore();
+  const {
+    messages, broadcastRoomId, isConnected,
+    setMessages, setRoomId, setConnected,
+    addMessage, addHeartTap,
+    setOnlineUsers, upsertOnlineUser, removeOnlineUser,
+  } = useChatStore();
   const {accessToken} = useAuthStore();
   const ws = useRef<WebSocket | null>(null);
   const reconnectAttempt = useRef(0);
@@ -75,9 +81,17 @@ export function useBroadcastChat() {
       }
       setConnected(true);
       reconnectAttempt.current = 0;
+      heartTapBridge.send = (effect: 'heart' | 'clap') => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({type: 'heart_tap', effect}));
+        }
+      };
       try {
-        const res = await chatApi.getMessages(broadcastRoomId);
-        const history: any[] = res.data?.data ?? [];
+        const [msgRes, onlineRes] = await Promise.all([
+          chatApi.getMessages(broadcastRoomId),
+          usersApi.getOnline(),
+        ]);
+        const history: any[] = msgRes.data?.data ?? [];
         setMessages(
           history.map(m => ({
             id: m.id,
@@ -88,10 +102,13 @@ export function useBroadcastChat() {
             createdAt: m.created_at,
           })),
         );
+        const users = Array.isArray(onlineRes.data) ? onlineRes.data : [];
+        setOnlineUsers(users);
       } catch {}
     };
 
     socket.onclose = () => {
+      heartTapBridge.send = null;
       setConnected(false);
       if (!shouldReconnect.current) return;
       const delay = RECONNECT_DELAYS[Math.min(reconnectAttempt.current, RECONNECT_DELAYS.length - 1)];
@@ -104,6 +121,23 @@ export function useBroadcastChat() {
     socket.onmessage = event => {
       try {
         const raw = JSON.parse(event.data);
+        if (raw.type === 'heart_tap') {
+          addHeartTap({
+            userId: raw.user_id,
+            username: raw.username ?? '',
+            avatarUrl: raw.avatar_url ?? '',
+            effect: raw.effect === 'clap' ? 'clap' : 'heart',
+          });
+          return;
+        }
+        if (raw.type === 'presence') {
+          if (raw.action === 'join') {
+            upsertOnlineUser({id: raw.user_id, username: raw.username, avatar_url: raw.avatar_url});
+          } else if (raw.action === 'leave') {
+            removeOnlineUser(raw.user_id);
+          }
+          return;
+        }
         if (raw.id && raw.body) {
           addMessage({
             id: raw.id,
@@ -116,7 +150,7 @@ export function useBroadcastChat() {
         }
       } catch {}
     };
-  }, [broadcastRoomId, accessToken, setConnected, addMessage, setMessages]);
+  }, [broadcastRoomId, accessToken, setConnected, addMessage, addHeartTap, setMessages, setOnlineUsers, upsertOnlineUser, removeOnlineUser]);
 
   useEffect(() => {
     if (!broadcastRoomId || !accessToken) return;
@@ -126,6 +160,7 @@ export function useBroadcastChat() {
 
     return () => {
       shouldReconnect.current = false;
+      heartTapBridge.send = null;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       if (connectTimer.current) clearTimeout(connectTimer.current);
       if (ws.current) {

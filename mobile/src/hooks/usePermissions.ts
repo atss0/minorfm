@@ -1,12 +1,36 @@
-import {Alert, Linking, Platform} from 'react-native';
+import {Linking, Platform} from 'react-native';
 import {PermissionsAndroid} from 'react-native';
+import {useState} from 'react';
+import type {AlertButton} from '../components/CustomAlert';
+
+export interface PermissionAlertConfig {
+  visible: boolean;
+  title: string;
+  message: string;
+  buttons: AlertButton[];
+}
 
 export function usePermissions() {
+  const [permissionAlert, setPermissionAlert] = useState<PermissionAlertConfig>({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [],
+  });
+
+  const dismissPermissionAlert = () =>
+    setPermissionAlert(prev => ({...prev, visible: false}));
+
   const showSettingsAlert = (message: string) => {
-    Alert.alert('İzin Gerekli', message, [
-      {text: 'İptal', style: 'cancel'},
-      {text: 'Ayarlar', onPress: () => Linking.openSettings()},
-    ]);
+    setPermissionAlert({
+      visible: true,
+      title: 'İzin Gerekli',
+      message,
+      buttons: [
+        {text: 'İptal', style: 'cancel', onPress: dismissPermissionAlert},
+        {text: 'Ayarlar', onPress: () => { dismissPermissionAlert(); Linking.openSettings(); }},
+      ],
+    });
   };
 
   const requestMicrophone = async (): Promise<boolean> => {
@@ -74,5 +98,5 @@ export function usePermissions() {
     return false;
   };
 
-  return {requestMicrophone, requestCamera, requestMediaImages};
+  return {requestMicrophone, requestCamera, requestMediaImages, permissionAlert, dismissPermissionAlert};
 }

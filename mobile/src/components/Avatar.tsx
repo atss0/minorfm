@@ -19,8 +19,7 @@ export default function Avatar({uri, username, size = 40, style}: Props) {
   useEffect(() => {
     setLoaded(false);
   }, [uri]);
-
-
+  
   return (
     <View
       style={[

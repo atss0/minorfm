@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useState, useRef} from 'react';
 import {RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import {useQueryClient} from '@tanstack/react-query';
 import {usersApi} from '../../api/users';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
+import FollowListModal from '../../components/FollowListModal';
 import {colors, spacing} from '../../theme';
 import type {AppStackParamList} from '../../navigation/RootNavigator';
 
@@ -19,6 +20,13 @@ export default function YouScreen() {
   const {user, updateUser} = useAuthStore();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
+  const [followModalVisible, setFollowModalVisible] = useState(false);
+
+  const openFollowModal = (type: 'followers' | 'following') => {
+    setFollowModalType(type);
+    setFollowModalVisible(true);
+  };
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -92,21 +100,38 @@ export default function YouScreen() {
           </AppText>
         ) : null}
         <View style={styles.stats}>
-          <View style={styles.statItem}>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => openFollowModal('followers')}
+            activeOpacity={0.7}>
             <AppText variant="subheading">
               {profileData?.followers_count ?? 0}
             </AppText>
             <AppText variant="caption">Takipçi</AppText>
-          </View>
+          </TouchableOpacity>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => openFollowModal('following')}
+            activeOpacity={0.7}>
             <AppText variant="subheading">
               {profileData?.following_count ?? 0}
             </AppText>
             <AppText variant="caption">Takip</AppText>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
+
+      <FollowListModal
+        visible={followModalVisible}
+        userId={profileData?.id ?? user?.id ?? ''}
+        type={followModalType}
+        onClose={() => setFollowModalVisible(false)}
+        onUserPress={username => {
+          setFollowModalVisible(false);
+          navigation.navigate('Profile', {username});
+        }}
+      />
     </ScrollView>
   );
 }

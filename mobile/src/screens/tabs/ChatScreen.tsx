@@ -1,6 +1,5 @@
 import React, {useCallback, useRef, useState} from 'react';
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,7 @@ import {showMessage} from 'react-native-flash-message';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
 import RecordingCard from '../../components/RecordingCard';
+import CustomAlert from '../../components/CustomAlert';
 import {colors, spacing, radius} from '../../theme';
 import {timeAgo} from '../../utils/time';
 import {useBroadcastChat} from '../../hooks/useBroadcastChat';
@@ -58,6 +58,7 @@ export default function ChatScreen() {
   const sendingRef = useRef(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [newMsgCount, setNewMsgCount] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const setAutoScrollState = (val: boolean) => {
     autoScrollRef.current = val;
@@ -99,22 +100,7 @@ export default function ChatScreen() {
   const handleLongPress = useCallback(
     (recording: RecordingItem) => {
       if (user?.id !== recording.user_id) return;
-      Alert.alert('Kaydı Sil', 'Bu kaydı silmek istediğinden emin misin?', [
-        {text: 'İptal', style: 'cancel'},
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await recordingsApi.delete(recording.id);
-              await queryClient.invalidateQueries({queryKey: ['recordings']});
-              showMessage({message: 'Kayıt silindi', type: 'success'});
-            } catch {
-              showMessage({message: 'Kayıt silinemedi', type: 'danger'});
-            }
-          },
-        },
-      ]);
+      setDeleteTarget(recording.id);
     },
     [queryClient, user?.id],
   );
@@ -291,6 +277,30 @@ export default function ChatScreen() {
           </AppText>
         </View>
       )}
+      <CustomAlert
+        visible={deleteTarget !== null}
+        title="Kaydı Sil"
+        message="Bu kaydı silmek istediğinden emin misin?"
+        buttons={[
+          {text: 'İptal', style: 'cancel', onPress: () => setDeleteTarget(null)},
+          {
+            text: 'Sil',
+            style: 'destructive',
+            onPress: async () => {
+              const id = deleteTarget!;
+              setDeleteTarget(null);
+              try {
+                await recordingsApi.delete(id);
+                await queryClient.invalidateQueries({queryKey: ['recordings']});
+                showMessage({message: 'Kayıt silindi', type: 'success'});
+              } catch {
+                showMessage({message: 'Kayıt silinemedi', type: 'danger'});
+              }
+            },
+          },
+        ]}
+        onRequestClose={() => setDeleteTarget(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
