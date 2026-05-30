@@ -24,6 +24,10 @@ type Config struct {
 	ResendAPIKey string
 	ResendFrom   string
 	AppURL       string
+
+	// OneSignal push notifications
+	OneSignalAppID  string
+	OneSignalAPIKey string
 }
 
 func Load() *Config {
@@ -44,6 +48,9 @@ func Load() *Config {
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
 		ResendFrom:   getEnv("RESEND_FROM", "MINOR.fm <noreply@minor.fm>"),
 		AppURL:       getEnv("APP_URL", "http://localhost:3000"),
+
+		OneSignalAppID:  getEnv("ONESIGNAL_APP_ID", "cd627586-9de2-4400-88f2-dad2d6c4a059"),
+		OneSignalAPIKey: getEnv("ONESIGNAL_API_KEY", ""),
 	}
 }
 
