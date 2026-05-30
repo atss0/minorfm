@@ -1,4 +1,4 @@
-import React, {useCallback} from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -10,58 +10,33 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
-import TrackPlayer from 'react-native-track-player';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import {useAuthStore} from '../../stores/authStore';
 import {usersApi} from '../../api/users';
 import {dmApi} from '../../api/dm';
-import {recordingsApi} from '../../api/recordings';
-import {useRecordingsStore} from '../../stores/recordingsStore';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
-import RecordingCard from '../../components/RecordingCard';
 import {colors, spacing} from '../../theme';
 import type {AppStackParamList} from '../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<AppStackParamList>;
 type Route = RouteProp<AppStackParamList, 'Profile'>;
 
-interface Recording {
-  id: string;
-  user_id: string;
-  user: {username: string; avatar_url: string};
-  audio_url: string;
-  duration: number;
-  title: string | null;
-  created_at: string;
-}
-
 export default function ProfileScreen() {
   const navigation = useNavigation<Nav>();
   const {params} = useRoute<Route>();
   const queryClient = useQueryClient();
   const {user: me} = useAuthStore();
-  const {currentIndex, isPlaying, progress, setQueue, setIndex, setPlaying} =
-    useRecordingsStore();
 
   const {data: profileData, isLoading} = useQuery({
     queryKey: ['profile', params.username],
     queryFn: () => usersApi.getProfile(params.username).then(r => r.data),
   });
 
-  const {data: recData} = useQuery({
-    queryKey: ['recordings'],
-    queryFn: () => recordingsApi.getList(1).then(r => r.data),
-  });
-
-  const allRecordings: Recording[] = recData?.recordings ?? recData ?? [];
-  const userRecordings = allRecordings.filter(r => r.user_id === profileData?.id);
-
   const followMutation = useMutation({
     mutationFn: () => usersApi.follow(profileData!.id),
     onSuccess: () => {
-      // Invalidate so follower count + is_following refresh from server
       queryClient.invalidateQueries({queryKey: ['profile', params.username]});
     },
   });
@@ -76,32 +51,6 @@ export default function ProfileScreen() {
       });
     } catch {}
   };
-
-  const handleRecordingPress = useCallback(
-    async (recording: Recording, idx: number) => {
-      if (currentIndex === idx && isPlaying) {
-        await TrackPlayer.pause();
-        setPlaying(false);
-        return;
-      }
-      setQueue(userRecordings);
-      setIndex(idx);
-      setPlaying(true);
-      await TrackPlayer.reset();
-      await TrackPlayer.add(
-        userRecordings.map(r => ({
-          id: r.id,
-          url: r.audio_url,
-          title: r.title ?? 'Adsız kayıt',
-          artist: r.user.username,
-          duration: r.duration,
-        })),
-      );
-      await TrackPlayer.skip(idx);
-      await TrackPlayer.play();
-    },
-    [currentIndex, isPlaying, userRecordings, setIndex, setPlaying, setQueue],
-  );
 
   const isOwnProfile = me?.username === params.username;
 
@@ -181,26 +130,6 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <View style={styles.section}>
-            <AppText variant="label" style={styles.sectionTitle}>
-              Kayıtlar
-            </AppText>
-            {userRecordings.length === 0 ? (
-              <View style={styles.emptyState}>
-                <AppText variant="caption">Henüz kayıt yok</AppText>
-              </View>
-            ) : (
-              userRecordings.map((r, idx) => (
-                <RecordingCard
-                  key={r.id}
-                  recording={r}
-                  isPlaying={currentIndex === idx && isPlaying}
-                  progress={currentIndex === idx ? progress : 0}
-                  onPress={() => handleRecordingPress(r, idx)}
-                />
-              ))
-            )}
-          </View>
         </ScrollView>
       )}
     </View>
@@ -254,7 +183,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  section: {marginTop: spacing.sm},
-  sectionTitle: {paddingHorizontal: spacing.md, paddingBottom: spacing.sm},
-  emptyState: {padding: spacing.xl, alignItems: 'center'},
 });
