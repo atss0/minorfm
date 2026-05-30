@@ -1,5 +1,5 @@
-import {useCallback} from 'react';
-import TrackPlayer, {Event, useTrackPlayerEvents} from 'react-native-track-player';
+import {useCallback, useEffect} from 'react';
+import TrackPlayer, {Event, useTrackPlayerEvents, useProgress} from 'react-native-track-player';
 import {useRecordingsStore} from '../stores/recordingsStore';
 
 export function useRecordingsPlayer() {
@@ -11,8 +11,17 @@ export function useRecordingsPlayer() {
     setQueue,
     setIndex,
     setPlaying,
+    setProgress,
     playNext,
   } = useRecordingsStore();
+
+  // Track playback progress (update store every 500ms while playing)
+  const {position, duration} = useProgress(500);
+  useEffect(() => {
+    if (isPlaying && duration > 0) {
+      setProgress(position / duration);
+    }
+  }, [position, duration, isPlaying, setProgress]);
 
   // Auto-advance to next recording when current finishes
   useTrackPlayerEvents([Event.PlaybackQueueEnded], () => {

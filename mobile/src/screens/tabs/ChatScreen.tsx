@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import {showMessage} from 'react-native-flash-message';
 import Avatar from '../../components/Avatar';
@@ -20,9 +21,9 @@ import RecordingCard from '../../components/RecordingCard';
 import {colors, spacing, radius} from '../../theme';
 import {timeAgo} from '../../utils/time';
 import {useBroadcastChat} from '../../hooks/useBroadcastChat';
-import {useRecordingsAudio, RecordingItem} from '../../hooks/useRecordingsAudio';
+import {useRecordingsPlayer} from '../../hooks/useRecordingsPlayer';
+import type {RecordingItem} from '../../hooks/useRecordingsAudio';
 import {useAuthStore} from '../../stores/authStore';
-import {useRecordingsStore} from '../../stores/recordingsStore';
 import {recordingsApi} from '../../api/recordings';
 
 interface ChatMessage {
@@ -38,16 +39,26 @@ type FeedItem =
   | {kind: 'message'; id: string; ts: string; data: ChatMessage}
   | {kind: 'recording'; id: string; ts: string; data: RecordingItem};
 
+// Fixed inner container height of CustomTabBar (see CustomTabBar.tsx styles.container)
+const TAB_BAR_HEIGHT = 56;
+
 export default function ChatScreen() {
   const {user} = useAuthStore();
+  const insets = useSafeAreaInsets();
   const {messages, isConnected, sendMessage} = useBroadcastChat();
   const [text, setText] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const autoScrollRef = useRef(true);
+  const sendingRef = useRef(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [newMsgCount, setNewMsgCount] = useState(0);
 
-  const {currentIndex, isPlaying, progress} = useRecordingsStore();
-  const {play, pause, resume} = useRecordingsAudio();
+  const setAutoScrollState = (val: boolean) => {
+    autoScrollRef.current = val;
+    setAutoScroll(val);
+  };
+
+  const {currentIndex, isPlaying, progress, play, pause, resume} = useRecordingsPlayer();
   const queryClient = useQueryClient();
 
   const {data: recData, isRefetching, refetch} = useQuery({
@@ -102,11 +113,14 @@ export default function ChatScreen() {
   );
 
   const handleSend = useCallback(() => {
+    if (sendingRef.current) return;
     const trimmed = text.trim();
     if (!trimmed || !user) return;
+    sendingRef.current = true;
+    setTimeout(() => { sendingRef.current = false; }, 500);
     sendMessage(trimmed);
     setText('');
-    setAutoScroll(true);
+    setAutoScrollState(true);
     setNewMsgCount(0);
   }, [text, user, sendMessage]);
 
@@ -114,7 +128,7 @@ export default function ChatScreen() {
     ({nativeEvent}: {nativeEvent: {contentOffset: {y: number}; contentSize: {height: number}; layoutMeasurement: {height: number}}}) => {
       const {contentOffset, contentSize, layoutMeasurement} = nativeEvent;
       const atBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 40;
-      setAutoScroll(atBottom);
+      setAutoScrollState(atBottom);
       if (atBottom) setNewMsgCount(0);
     },
     [],
@@ -123,7 +137,7 @@ export default function ChatScreen() {
   const scrollToBottom = () => {
     flatListRef.current?.scrollToEnd({animated: true});
     setNewMsgCount(0);
-    setAutoScroll(true);
+    setAutoScrollState(true);
   };
 
   const renderItem = ({item, index}: {item: FeedItem; index: number}) => {
@@ -181,8 +195,8 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}>
+      behavior="padding"
+      keyboardVerticalOffset={TAB_BAR_HEIGHT + insets.bottom}>
 
       {user && !isConnected && (
         <View style={styles.connectingBar}>
@@ -216,8 +230,8 @@ export default function ChatScreen() {
           />
         }
         onContentSizeChange={() => {
-          if (autoScroll) {
-            flatListRef.current?.scrollToEnd({animated: false});
+          if (autoScrollRef.current) {
+            setTimeout(() => flatListRef.current?.scrollToEnd({animated: true}), 50);
           } else {
             setNewMsgCount(c => c + 1);
           }
