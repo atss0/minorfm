@@ -43,7 +43,6 @@ export default function DynamicListenerGrid({
 
   const {user} = useAuthStore();
   const lastHeartTap = useChatStore(s => s.lastHeartTap);
-  const addHeartTap = useChatStore(s => s.addHeartTap);
 
   const listenersRef = useRef(listeners);
   const userIdRef = useRef(user?.id);
@@ -132,14 +131,14 @@ export default function DynamicListenerGrid({
     const effect: 'heart' | 'clap' = tapCountRef.current >= 3 ? 'clap' : 'heart';
     const me = userRef.current;
 
-    // Optimistic local feedback — immediate, no WS round-trip needed
+    // Direct call — skips chatStore/useEffect cycle, shows immediately
     if (me) {
-      addHeartTap({userId: me.id, username: me.username, avatarUrl: me.avatar_url ?? '', effect});
+      showHeartTapFor(me.id, effect);
     }
-    // Broadcast to others
+    // Broadcast to others via WS
     heartTapBridge.send?.(effect);
     HapticFeedback.trigger('impactLight', HAPTIC_OPTIONS);
-  }, [addHeartTap]);
+  }, [showHeartTapFor]);
 
   const doubleTap = useMemo(
     () =>
