@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import NetInfo from '@react-native-community/netinfo';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
@@ -32,6 +33,7 @@ interface Message {
 
 const BASE_WS = 'wss://api.minor.fm';
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
+const CONNECT_TIMEOUT_MS = 8000;
 
 export default function DMConversationScreen() {
   const navigation = useNavigation();
@@ -44,6 +46,7 @@ export default function DMConversationScreen() {
   const ws = useRef<WebSocket | null>(null);
   const reconnectAttempt = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnect = useRef(true);
   const sendingRef = useRef(false);
 
@@ -68,73 +71,105 @@ export default function DMConversationScreen() {
       .catch(() => {});
   }, [params.roomId]);
 
-  // WebSocket connection with reconnect backoff
-  useEffect(() => {
-    if (!accessToken) {
-      return;
+  // WebSocket connection with reconnect backoff + connect timeout
+  const connectWS = useCallback(() => {
+    if (!accessToken || !shouldReconnect.current) return;
+
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
     }
-    shouldReconnect.current = true;
+    if (connectTimer.current) {
+      clearTimeout(connectTimer.current);
+      connectTimer.current = null;
+    }
+    if (ws.current && ws.current.readyState !== WebSocket.CLOSED) {
+      ws.current.onclose = null;
+      ws.current.close();
+      ws.current = null;
+    }
 
-    const connect = () => {
-      const socket = new WebSocket(
-        `${BASE_WS}/ws/chat/${params.roomId}?token=${accessToken}`,
-      );
-      ws.current = socket;
+    const socket = new WebSocket(
+      `${BASE_WS}/ws/chat/${params.roomId}?token=${accessToken}`,
+    );
+    ws.current = socket;
 
-      socket.onopen = () => {
-        reconnectAttempt.current = 0;
-      };
+    connectTimer.current = setTimeout(() => {
+      if (socket.readyState !== WebSocket.OPEN) socket.close();
+      connectTimer.current = null;
+    }, CONNECT_TIMEOUT_MS);
 
-      socket.onclose = () => {
-        if (!shouldReconnect.current) {
-          return;
-        }
-        const delay =
-          RECONNECT_DELAYS[
-            Math.min(reconnectAttempt.current, RECONNECT_DELAYS.length - 1)
-          ];
-        reconnectAttempt.current++;
-        reconnectTimer.current = setTimeout(connect, delay);
-      };
-
-      socket.onerror = () => socket.close();
-
-      // Backend broadcasts: {id, room_id, user_id, username, avatar_url, body, created_at}
-      socket.onmessage = event => {
-        try {
-          const raw = JSON.parse(event.data);
-          if (!raw.id || !raw.body) {
-            return;
-          }
-          const msg: Message = {
-            id: raw.id,
-            user_id: raw.user_id,
-            user: {
-              username: raw.username,
-              avatar_url: raw.avatar_url,
-            },
-            body: raw.body,
-            created_at: raw.created_at,
-          };
-          // Prepend so newest stays at index 0 (inverted FlatList = bottom)
-          setMessages(prev =>
-            prev.some(m => m.id === msg.id) ? prev : [msg, ...prev],
-          );
-        } catch {}
-      };
+    socket.onopen = () => {
+      if (connectTimer.current) {
+        clearTimeout(connectTimer.current);
+        connectTimer.current = null;
+      }
+      reconnectAttempt.current = 0;
     };
 
-    connect();
+    socket.onclose = () => {
+      if (!shouldReconnect.current) return;
+      const delay =
+        RECONNECT_DELAYS[
+          Math.min(reconnectAttempt.current, RECONNECT_DELAYS.length - 1)
+        ];
+      reconnectAttempt.current++;
+      reconnectTimer.current = setTimeout(() => connectWS(), delay);
+    };
 
-    return () => {
-      shouldReconnect.current = false;
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-      }
-      ws.current?.close();
-      ws.current = null;
+    socket.onerror = () => socket.close();
+
+    socket.onmessage = event => {
+      try {
+        const raw = JSON.parse(event.data);
+        if (!raw.id || !raw.body) return;
+        const msg: Message = {
+          id: raw.id,
+          user_id: raw.user_id,
+          user: {username: raw.username, avatar_url: raw.avatar_url},
+          body: raw.body,
+          created_at: raw.created_at,
+        };
+        setMessages(prev =>
+          prev.some(m => m.id === msg.id) ? prev : [msg, ...prev],
+        );
+      } catch {}
     };
   }, [params.roomId, accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    shouldReconnect.current = true;
+    connectWS();
+    return () => {
+      shouldReconnect.current = false;
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (connectTimer.current) clearTimeout(connectTimer.current);
+      if (ws.current) {
+        ws.current.onclose = null;
+        ws.current.close();
+        ws.current = null;
+      }
+    };
+  }, [params.roomId, accessToken, connectWS]);
+
+  // Re-connect immediately when network comes back
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const online = state.isConnected ?? false;
+      if (online && shouldReconnect.current) {
+        const isClosed =
+          !ws.current ||
+          ws.current.readyState === WebSocket.CLOSED ||
+          ws.current.readyState === WebSocket.CLOSING;
+        if (isClosed) {
+          reconnectAttempt.current = 0;
+          connectWS();
+        }
+      }
+    });
+    return unsubscribe;
+  }, [connectWS]);
 
   const handleSend = useCallback(() => {
     if (sendingRef.current) {
