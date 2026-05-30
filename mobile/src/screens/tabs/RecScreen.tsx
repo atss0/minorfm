@@ -24,7 +24,9 @@ import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useQueryClient} from '@tanstack/react-query';
 import {showMessage} from 'react-native-flash-message';
+import {radioApi} from '../../api/radio';
 import DynamicListenerGrid from '../../components/DynamicListenerGrid';
+import LiveStatsBar from '../../components/LiveStatsBar';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
 import {useAuthStore} from '../../stores/authStore';
@@ -57,6 +59,9 @@ export default function RecScreen() {
   const {user} = useAuthStore();
   const {shouldStartRecording, clearStartRecording} = useUIStore();
   const onlineUsers = useChatStore(s => s.onlineUsers);
+  const lastHeartTap = useChatStore(s => s.lastHeartTap);
+
+  const [stats, setStats] = useState({hearts: 0, claps: 0, listeners: 0});
 
   const [recState, setRecState] = useState<RecState>('idle');
   const [recordedPath, setRecordedPath] = useState<string | null>(null);
@@ -65,6 +70,36 @@ export default function RecScreen() {
   const [isStopping, setIsStopping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [title, setTitle] = useState('');
+
+  // Fetch live stats every 15s
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const res = await radioApi.getLiveStats();
+        const d = res.data as {hearts: number; claps: number; listeners: number};
+        setStats({hearts: d.hearts ?? 0, claps: d.claps ?? 0, listeners: d.listeners ?? 0});
+      } catch {}
+    };
+    fetch();
+    const id = setInterval(fetch, 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Optimistic +1 when a heart_tap event is received
+  useEffect(() => {
+    if (!lastHeartTap) return;
+    setStats(prev => ({
+      ...prev,
+      hearts: lastHeartTap.effect === 'heart' ? prev.hearts + 1 : prev.hearts,
+      claps: lastHeartTap.effect === 'clap' ? prev.claps + 1 : prev.claps,
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastHeartTap?.seq]);
+
+  // Keep listeners count in sync with presence store
+  useEffect(() => {
+    setStats(prev => ({...prev, listeners: onlineUsers.length}));
+  }, [onlineUsers.length]);
 
   // Always include the current user at the top of the grid
   const listeners = useMemo(() => {
@@ -278,6 +313,7 @@ export default function RecScreen() {
 
   return (
     <View style={styles.container}>
+      <LiveStatsBar hearts={stats.hearts} claps={stats.claps} listeners={stats.listeners} />
       <View style={styles.header}>
         <AppText variant="label">
           Şu an dinleyenler ({listeners.length})

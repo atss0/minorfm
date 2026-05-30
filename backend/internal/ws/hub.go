@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -144,8 +145,16 @@ func (h *Hub) PublishPresence(roomID, action, userID, username, avatarURL string
 	return h.rdb.Publish(context.Background(), "chat:"+roomID, string(data)).Err()
 }
 
-// PublishHeartTap broadcasts a heart_tap event to all clients in the room (no DB write).
+// PublishHeartTap broadcasts a heart_tap event and increments the daily stats counter.
 func (h *Hub) PublishHeartTap(roomID, userID, username, avatarURL, effect string) error {
+	ctx := context.Background()
+	today := time.Now().UTC().Format("2006-01-02")
+
+	statKey := fmt.Sprintf("stats:%s:%ss", today, effect) // "stats:2026-05-30:hearts" or ":claps"
+	if n, err := h.rdb.Incr(ctx, statKey).Result(); err == nil && n == 1 {
+		h.rdb.Expire(ctx, statKey, 25*time.Hour)
+	}
+
 	out := &OutgoingHeartTap{
 		Type:      "heart_tap",
 		UserID:    userID,
@@ -157,7 +166,7 @@ func (h *Hub) PublishHeartTap(roomID, userID, username, avatarURL, effect string
 	if err != nil {
 		return err
 	}
-	return h.rdb.Publish(context.Background(), "chat:"+roomID, string(data)).Err()
+	return h.rdb.Publish(ctx, "chat:"+roomID, string(data)).Err()
 }
 
 func (h *Hub) subscribeRoom(ctx context.Context, roomID string) {

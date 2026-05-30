@@ -180,6 +180,9 @@ func Setup(app *fiber.App, db *gorm.DB, rdb *redis.Client, cfg *config.Config) {
 	radioGroup.Get("/current", h.GetRadioCurrent)
 	radioGroup.Get("/queue", h.GetRadioQueue)
 
+	// live stream stats (public)
+	api.Get("/stream/stats/live", h.GetLiveStats)
+
 	// admin (admin + moderator)
 	admin := api.Group("/admin", protected, adminOrMod)
 	admin.Get("/stats", h.AdminGetStats)
