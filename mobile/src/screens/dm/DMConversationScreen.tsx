@@ -40,7 +40,6 @@ export default function DMConversationScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
 
   const ws = useRef<WebSocket | null>(null);
   const reconnectAttempt = useRef(0);
@@ -83,12 +82,10 @@ export default function DMConversationScreen() {
       ws.current = socket;
 
       socket.onopen = () => {
-        setIsConnected(true);
         reconnectAttempt.current = 0;
       };
 
       socket.onclose = () => {
-        setIsConnected(false);
         if (!shouldReconnect.current) {
           return;
         }
@@ -204,7 +201,6 @@ export default function DMConversationScreen() {
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <AppText variant="subheading">{params.name ?? 'Mesaj'}</AppText>
-            {isConnected && <View style={styles.onlineDot} />}
           </View>
           <View style={styles.iconBtn} />
         </View>
@@ -268,12 +264,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.online,
   },
   messageList: {
     paddingHorizontal: spacing.md,
