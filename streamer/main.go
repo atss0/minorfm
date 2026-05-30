@@ -90,6 +90,7 @@ func main() {
 	mux.HandleFunc("/", basicAuth(handleIndex))
 	mux.HandleFunc("/stream", handleStream)   // public — listeners
 	mux.HandleFunc("/events", handleSSE)      // public — SSE for listeners
+	mux.HandleFunc("/api/now", handleNow)     // public — current track metadata
 	mux.HandleFunc("/api/status", basicAuth(handleStatus))
 	mux.HandleFunc("/api/queue", basicAuth(handleQueue))
 	mux.HandleFunc("/api/queue/reorder", basicAuth(handleReorder))
@@ -250,6 +251,22 @@ func handleSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// ── Now (public metadata) ─────────────────────────────────────────────────────
+
+func handleNow(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	cur := bc.Current()
+	title := ""
+	if cur != nil {
+		title = cur.Title
+	}
+	json.NewEncoder(w).Encode(map[string]any{
+		"title":   title,
+		"playing": bc.IsPlaying(),
+	})
 }
 
 // ── Status ───────────────────────────────────────────────────────────────────

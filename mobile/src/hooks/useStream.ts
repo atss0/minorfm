@@ -63,23 +63,23 @@ export function useStream() {
     }
   }, [playbackState.state, setPlaying]);
 
-  // Poll metadata every 30s
+  // Poll live metadata from streamer every 15s
   useEffect(() => {
     const fetchMeta = async () => {
       try {
-        const res = await radioApi.getCurrent();
-        const track = res.data?.track;
-        if (track?.title || track?.artist) {
+        const res = await fetch('https://stream.minor.fm/api/now');
+        const data = await res.json();
+        if (data?.title) {
           setMeta({
-            artist: track.artist ?? '',
-            title: track.title ?? '',
-            cover_url: track.cover_url || undefined,
+            artist: 'MINOR.fm',
+            title: data.title,
+            cover_url: undefined,
           });
         }
       } catch {}
     };
     fetchMeta();
-    const interval = setInterval(fetchMeta, 30_000);
+    const interval = setInterval(fetchMeta, 15_000);
     return () => clearInterval(interval);
   }, [setMeta]);
 
