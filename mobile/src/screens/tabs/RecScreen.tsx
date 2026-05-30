@@ -20,6 +20,8 @@ import Animated, {
 import {useSoundWithStates} from 'react-native-nitro-sound';
 import HapticFeedback from 'react-native-haptic-feedback';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {showMessage} from 'react-native-flash-message';
 import DynamicListenerGrid from '../../components/DynamicListenerGrid';
@@ -32,6 +34,9 @@ import {recordingsApi} from '../../api/recordings';
 import {usersApi} from '../../api/users';
 import {navigateToTab} from '../../navigation/pagerRef';
 import {useState} from 'react';
+import type {AppStackParamList} from '../../navigation/RootNavigator';
+
+type Nav = NativeStackNavigationProp<AppStackParamList>;
 
 type RecState = 'idle' | 'recording' | 'preview';
 
@@ -43,6 +48,7 @@ function fmtMs(ms: number): string {
 }
 
 export default function RecScreen() {
+  const navigation = useNavigation<Nav>();
   const {height: screenHeight} = useWindowDimensions();
   const queryClient = useQueryClient();
   const {user} = useAuthStore();
@@ -273,6 +279,11 @@ export default function RecScreen() {
       <DynamicListenerGrid
         listeners={listeners}
         maxHeight={screenHeight * 0.7}
+        onListenerPress={l => {
+          if (l.id !== user?.id) {
+            navigation.navigate('Profile', {username: l.username});
+          }
+        }}
       />
 
       <View style={styles.recordHintSection}>

@@ -114,6 +114,11 @@ export default function YouScreen() {
         <View style={styles.iconRow}>
           <TouchableOpacity
             style={styles.iconBtn}
+            onPress={() => navigation.navigate('Search')}>
+            <MaterialIcon name="search" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
             onPress={() => navigation.navigate('Notifications')}>
             <MaterialIcon
               name="notifications-none"

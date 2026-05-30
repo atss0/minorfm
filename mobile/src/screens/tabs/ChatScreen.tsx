@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
@@ -25,6 +27,7 @@ import {useRecordingsPlayer} from '../../hooks/useRecordingsPlayer';
 import type {RecordingItem} from '../../hooks/useRecordingsAudio';
 import {useAuthStore} from '../../stores/authStore';
 import {recordingsApi} from '../../api/recordings';
+import type {AppStackParamList} from '../../navigation/RootNavigator';
 
 interface ChatMessage {
   id: string;
@@ -42,7 +45,10 @@ type FeedItem =
 // Fixed inner container height of CustomTabBar (see CustomTabBar.tsx styles.container)
 const TAB_BAR_HEIGHT = 56;
 
+type Nav = NativeStackNavigationProp<AppStackParamList>;
+
 export default function ChatScreen() {
+  const navigation = useNavigation<Nav>();
   const {user} = useAuthStore();
   const insets = useSafeAreaInsets();
   const {messages, isConnected, sendMessage} = useBroadcastChat();
@@ -174,12 +180,20 @@ export default function ChatScreen() {
 
     return (
       <View style={styles.msgRow}>
-        <Avatar uri={msg.user.avatar_url} username={msg.user.username} size={32} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile', {username: msg.user.username})}
+          activeOpacity={0.75}>
+          <Avatar uri={msg.user.avatar_url} username={msg.user.username} size={32} />
+        </TouchableOpacity>
         <View style={styles.msgContent}>
           <View style={styles.msgHeader}>
-            <AppText variant="caption" style={styles.username}>
-              {msg.user.username}
-            </AppText>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Profile', {username: msg.user.username})}
+              activeOpacity={0.7}>
+              <AppText variant="caption" style={styles.username}>
+                {msg.user.username}
+              </AppText>
+            </TouchableOpacity>
             <AppText variant="caption" style={styles.time}>
               {timeAgo(msg.createdAt)}
             </AppText>
