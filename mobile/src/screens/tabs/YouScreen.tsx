@@ -3,30 +3,16 @@ import {RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View} from 're
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useQuery} from '@tanstack/react-query';
-import TrackPlayer from 'react-native-track-player';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
 import {useAuthStore} from '../../stores/authStore';
 import {useQueryClient} from '@tanstack/react-query';
 import {usersApi} from '../../api/users';
-import {recordingsApi} from '../../api/recordings';
-import {useRecordingsStore} from '../../stores/recordingsStore';
 import Avatar from '../../components/Avatar';
 import AppText from '../../components/AppText';
-import RecordingCard from '../../components/RecordingCard';
 import {colors, spacing} from '../../theme';
 import type {AppStackParamList} from '../../navigation/RootNavigator';
 
 type Nav = NativeStackNavigationProp<AppStackParamList>;
-
-interface Recording {
-  id: string;
-  user_id: string;
-  user: {username: string; avatar_url: string};
-  audio_url: string;
-  duration: number;
-  title: string | null;
-  created_at: string;
-}
 
 export default function YouScreen() {
   const navigation = useNavigation<Nav>();
@@ -41,54 +27,15 @@ export default function YouScreen() {
       const me = res.data?.user ?? res.data;
       if (me) updateUser(me);
     } catch {}
-    await Promise.all([
-      queryClient.invalidateQueries({queryKey: ['profile', user?.username]}),
-      queryClient.invalidateQueries({queryKey: ['recordings']}),
-    ]);
+    await queryClient.invalidateQueries({queryKey: ['profile', user?.username]});
     setRefreshing(false);
   }, [user?.username, updateUser, queryClient]);
-  const {currentIndex, isPlaying, progress, setQueue, setIndex, setPlaying} =
-    useRecordingsStore();
 
   const {data: profileData} = useQuery({
     queryKey: ['profile', user?.username],
     queryFn: () => usersApi.getProfile(user!.username).then(r => r.data),
     enabled: !!user?.username,
   });
-
-  const {data: recData} = useQuery({
-    queryKey: ['recordings'],
-    queryFn: () => recordingsApi.getList(1).then(r => r.data),
-  });
-
-  const allRecordings: Recording[] = recData?.recordings ?? recData ?? [];
-  const myRecordings = allRecordings.filter(r => r.user_id === user?.id);
-
-  const handleRecordingPress = useCallback(
-    async (recording: Recording, idx: number) => {
-      if (currentIndex === idx && isPlaying) {
-        await TrackPlayer.pause();
-        setPlaying(false);
-        return;
-      }
-      setQueue(myRecordings);
-      setIndex(idx);
-      setPlaying(true);
-      await TrackPlayer.reset();
-      await TrackPlayer.add(
-        myRecordings.map(r => ({
-          id: r.id,
-          url: r.audio_url,
-          title: r.title ?? 'Adsız kayıt',
-          artist: r.user.username,
-          duration: r.duration,
-        })),
-      );
-      await TrackPlayer.skip(idx);
-      await TrackPlayer.play();
-    },
-    [currentIndex, isPlaying, myRecordings, setIndex, setPlaying, setQueue],
-  );
 
   if (!user) {
     return null;
@@ -158,33 +105,7 @@ export default function YouScreen() {
             </AppText>
             <AppText variant="caption">Takip</AppText>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <AppText variant="subheading">{myRecordings.length}</AppText>
-            <AppText variant="caption">Kayıt</AppText>
-          </View>
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label" style={styles.sectionTitle}>
-          Kayıtlarım
-        </AppText>
-        {myRecordings.length === 0 ? (
-          <View style={styles.emptyState}>
-            <AppText variant="caption">Henüz kayıt yok</AppText>
-          </View>
-        ) : (
-          myRecordings.map((r, idx) => (
-            <RecordingCard
-              key={r.id}
-              recording={r}
-              isPlaying={currentIndex === idx && isPlaying}
-              progress={currentIndex === idx ? progress : 0}
-              onPress={() => handleRecordingPress(r, idx)}
-            />
-          ))
-        )}
       </View>
     </ScrollView>
   );
@@ -247,16 +168,5 @@ const styles = StyleSheet.create({
     width: 1,
     height: 24,
     backgroundColor: colors.border,
-  },
-  section: {
-    marginTop: spacing.sm,
-  },
-  sectionTitle: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  emptyState: {
-    padding: spacing.xl,
-    alignItems: 'center',
   },
 });

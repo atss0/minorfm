@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo} from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   PermissionsAndroid,
   Platform,
   StyleSheet,
@@ -8,8 +9,8 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
-  // TouchableOpacity used in recording/preview states
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
@@ -47,8 +48,11 @@ function fmtMs(ms: number): string {
   return `${m}:${s}`;
 }
 
+const TAB_BAR_HEIGHT = 56;
+
 export default function RecScreen() {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const {height: screenHeight} = useWindowDimensions();
   const queryClient = useQueryClient();
   const {user} = useAuthStore();
@@ -231,7 +235,10 @@ export default function RecScreen() {
 
   if (recState === 'preview') {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <KeyboardAvoidingView
+        style={[styles.container, styles.centered]}
+        behavior="padding"
+        keyboardVerticalOffset={TAB_BAR_HEIGHT + insets.bottom}>
         <AppText style={styles.timer}>{fmtMs(recordedMs)}</AppText>
         <AppText style={styles.statusLabel}>Kayıt hazır</AppText>
         <TouchableOpacity
@@ -244,14 +251,24 @@ export default function RecScreen() {
             color={colors.textPrimary}
           />
         </TouchableOpacity>
-        <TextInput
-          style={styles.titleInput}
-          placeholder="Başlık ekle (isteğe bağlı)"
-          placeholderTextColor={colors.textSecondary}
-          value={title}
-          onChangeText={setTitle}
-          maxLength={80}
-        />
+        <View style={styles.titleWrap}>
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Başlık ekle (isteğe bağlı)"
+            placeholderTextColor={colors.textSecondary}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={80}
+            returnKeyType="done"
+            blurOnSubmit
+          />
+          <AppText style={[
+            styles.charCount,
+            title.length >= 80 && styles.charCountLimit,
+          ]}>
+            {title.length}/80
+          </AppText>
+        </View>
         <View style={styles.previewActions}>
           <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
             <AppText style={styles.discardLabel}>Tekrar</AppText>
@@ -264,7 +281,7 @@ export default function RecScreen() {
             style={styles.sendBtn}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -378,8 +395,12 @@ const styles = StyleSheet.create({
   },
 
   // preview
-  titleInput: {
+  titleWrap: {
     width: '80%',
+    marginBottom: spacing.xl,
+  },
+  titleInput: {
+    width: '100%',
     height: 44,
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -388,7 +409,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     color: colors.textPrimary,
     fontSize: 14,
-    marginBottom: spacing.xl,
+  },
+  charCount: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  charCountLimit: {
+    color: colors.primary,
   },
   playPreviewBtn: {
     width: 72,

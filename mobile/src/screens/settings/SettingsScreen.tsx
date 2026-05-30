@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
 
   const [username, setUsername] = useState(user?.username ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
@@ -58,6 +60,7 @@ export default function SettingsScreen() {
   });
 
   const handleAvatarPick = async () => {
+    if (avatarUploading) return;
     let image;
     try {
       image = await ImageCropPicker.openPicker({
@@ -74,6 +77,7 @@ export default function SettingsScreen() {
     } catch {
       return;
     }
+    setAvatarUploading(true);
     const formData = new FormData();
     formData.append('avatar', {
       uri: image.path,
@@ -90,6 +94,8 @@ export default function SettingsScreen() {
       }
     } catch {
       showMessage({message: 'Fotoğraf yüklenemedi', type: 'danger'});
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -116,12 +122,17 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}>
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handleAvatarPick} activeOpacity={0.8}>
+          <TouchableOpacity onPress={handleAvatarPick} activeOpacity={0.8} disabled={avatarUploading}>
             <Avatar
               uri={user?.avatar_url}
               username={user?.username ?? ''}
               size={80}
             />
+            {avatarUploading ? (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator size="small" color={colors.textPrimary} />
+              </View>
+            ) : (
             <View style={styles.avatarEditBadge}>
               <MaterialIcon
                 name="photo-camera"
@@ -129,6 +140,7 @@ export default function SettingsScreen() {
                 color={colors.textPrimary}
               />
             </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -252,6 +264,17 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
