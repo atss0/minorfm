@@ -46,7 +46,7 @@ func (h *Handler) GetProfile(c *fiber.Ctx) error {
 		"role":            user.Role,
 		"created_at":      user.CreatedAt,
 		"post_count":      postCount,
-		"follower_count":  followerCount,
+		"followers_count": followerCount,
 		"following_count": followingCount,
 		"is_following":    isFollowing,
 	})
