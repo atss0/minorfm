@@ -250,6 +250,18 @@ func (h *Handler) LikePost(c *fiber.Ctx) error {
 
 	h.DB.Create(&models.Like{UserID: uid, LikeableID: pid, LikeableType: "post"})
 	h.DB.Model(&models.Post{}).Where("id = ?", pid).UpdateColumn("like_count", gorm.Expr("like_count + 1"))
+
+	// Notify post author (skip if they liked their own post)
+	var post models.Post
+	if h.DB.Select("user_id").First(&post, "id = ?", pid).Error == nil && post.UserID != uid {
+		var liker models.User
+		if h.DB.Select("username").First(&liker, "id = ?", uid).Error == nil {
+			go h.pushNotification(post.UserID, "like", map[string]any{
+				"actor_username": liker.Username,
+			})
+		}
+	}
+
 	return c.JSON(fiber.Map{"liked": true})
 }
 

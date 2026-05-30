@@ -91,6 +91,15 @@ func (h *Handler) CreateComment(c *fiber.Ctx) error {
 	}
 
 	h.DB.Preload("User").First(&comment, "id = ?", comment.ID)
+
+	// Notify post author (skip if they commented on their own post)
+	var post models.Post
+	if h.DB.Select("user_id").First(&post, "id = ?", pid).Error == nil && post.UserID != uid {
+		go h.pushNotification(post.UserID, "comment", map[string]any{
+			"actor_username": comment.User.Username,
+		})
+	}
+
 	return c.Status(fiber.StatusCreated).JSON(comment)
 }
 

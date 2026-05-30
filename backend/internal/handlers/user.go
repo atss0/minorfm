@@ -154,6 +154,15 @@ func (h *Handler) FollowUser(c *fiber.Ctx) error {
 	if err := h.DB.Create(&follow).Error; err != nil {
 		return err
 	}
+
+	// Notify the followed user
+	var follower models.User
+	if h.DB.Select("username").First(&follower, "id = ?", uid).Error == nil {
+		go h.pushNotification(tid, "follow", map[string]any{
+			"actor_username": follower.Username,
+		})
+	}
+
 	return c.JSON(fiber.Map{"following": true})
 }
 
