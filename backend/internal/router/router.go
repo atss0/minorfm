@@ -170,6 +170,11 @@ func Setup(app *fiber.App, db *gorm.DB, rdb *redis.Client, cfg *config.Config) {
 	chat.Get("/rooms", h.GetRooms)
 	chat.Get("/rooms/:room_id/messages", h.GetRoomMessages)
 
+	// DM REST
+	dm := api.Group("/dm", protected)
+	dm.Get("/rooms", h.GetDMRooms)
+	dm.Post("/rooms", h.CreateDMRoom)
+
 	// radio REST
 	radioGroup := api.Group("/radio")
 	radioGroup.Get("/current", h.GetRadioCurrent)

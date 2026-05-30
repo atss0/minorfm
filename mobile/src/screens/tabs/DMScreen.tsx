@@ -1,5 +1,6 @@
 import React from 'react';
 import {FlatList, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useQuery} from '@tanstack/react-query';
@@ -34,7 +35,7 @@ export default function DMScreen() {
   const rooms: Room[] = data?.rooms ?? data ?? [];
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
         <AppText variant="subheading">Mesajlar</AppText>
         <TouchableOpacity
@@ -92,7 +93,7 @@ export default function DMScreen() {
         }
         contentContainerStyle={rooms.length === 0 ? {flexGrow: 1} : undefined}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

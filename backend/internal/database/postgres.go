@@ -24,6 +24,7 @@ func NewPostgres(dsn string) (*gorm.DB, error) {
 		&models.Bookmark{},
 		&models.ChatRoom{},
 		&models.ChatMessage{},
+		&models.ChatRoomMember{},
 		&models.Track{},
 		&models.Comment{},
 		&models.Notification{},

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
 import MaterialIcon from '@react-native-vector-icons/material-icons';
@@ -45,27 +46,30 @@ export default function DMConversationScreen() {
   const reconnectAttempt = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnect = useRef(true);
+  const sendingRef = useRef(false);
 
-  // Load message history
+  // Load message history via HTTP
   useEffect(() => {
     dmApi
       .getMessages(params.roomId)
       .then(res => {
-        const data = res.data?.messages ?? res.data ?? [];
-        // Normalize field names (server may send snake_case)
-        const normalized: Message[] = data.map((m: Record<string, unknown>) => ({
+        // Backend returns oldest-first after its internal reverse; keep that order.
+        // FlatList is inverted so data[0] = newest = shown at bottom.
+        const raw: Record<string, unknown>[] = res.data?.messages ?? res.data ?? [];
+        const normalized: Message[] = raw.map(m => ({
           id: m.id as string,
           user_id: (m.user_id ?? m.userId) as string,
           user: m.user as Message['user'],
           body: m.body as string,
           created_at: (m.created_at ?? m.createdAt) as string,
         }));
-        setMessages(normalized.reverse()); // newest first for inverted list
+        // Backend sends oldest-first; for inverted FlatList we want newest-first.
+        setMessages(normalized.reverse());
       })
       .catch(() => {});
   }, [params.roomId]);
 
-  // WebSocket connection
+  // WebSocket connection with reconnect backoff
   useEffect(() => {
     if (!accessToken) {
       return;
@@ -98,31 +102,27 @@ export default function DMConversationScreen() {
 
       socket.onerror = () => socket.close();
 
+      // Backend broadcasts: {id, room_id, user_id, username, avatar_url, body, created_at}
       socket.onmessage = event => {
         try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'message') {
-            const d = msg.data;
-            const normalized: Message = {
-              id: d.id,
-              user_id: d.user_id ?? d.userId,
-              user: d.user,
-              body: d.body,
-              created_at: d.created_at ?? d.createdAt,
-            };
-            setMessages(prev => [normalized, ...prev]);
-          } else if (msg.type === 'history') {
-            const normalized: Message[] = (msg.data ?? [])
-              .map((d: Record<string, unknown>) => ({
-                id: d.id as string,
-                user_id: (d.user_id ?? d.userId) as string,
-                user: d.user as Message['user'],
-                body: d.body as string,
-                created_at: (d.created_at ?? d.createdAt) as string,
-              }))
-              .reverse();
-            setMessages(normalized);
+          const raw = JSON.parse(event.data);
+          if (!raw.id || !raw.body) {
+            return;
           }
+          const msg: Message = {
+            id: raw.id,
+            user_id: raw.user_id,
+            user: {
+              username: raw.username,
+              avatar_url: raw.avatar_url,
+            },
+            body: raw.body,
+            created_at: raw.created_at,
+          };
+          // Prepend so newest stays at index 0 (inverted FlatList = bottom)
+          setMessages(prev =>
+            prev.some(m => m.id === msg.id) ? prev : [msg, ...prev],
+          );
         } catch {}
       };
     };
@@ -139,12 +139,19 @@ export default function DMConversationScreen() {
     };
   }, [params.roomId, accessToken]);
 
-  const sendMessage = useCallback(() => {
+  const handleSend = useCallback(() => {
+    if (sendingRef.current) {
+      return;
+    }
     const text = input.trim();
     if (!text || ws.current?.readyState !== WebSocket.OPEN) {
       return;
     }
-    ws.current.send(JSON.stringify({type: 'message', body: text}));
+    sendingRef.current = true;
+    setTimeout(() => {
+      sendingRef.current = false;
+    }, 500);
+    ws.current.send(JSON.stringify({body: text}));
     setInput('');
   }, [input]);
 
@@ -180,56 +187,67 @@ export default function DMConversationScreen() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.navHeader}>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => navigation.goBack()}>
-          <MaterialIcon name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <AppText variant="subheading">{params.name ?? 'Mesaj'}</AppText>
-          {isConnected && <View style={styles.onlineDot} />}
+    <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior="padding"
+        keyboardVerticalOffset={0}>
+        <View style={styles.navHeader}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => navigation.goBack()}>
+            <MaterialIcon
+              name="arrow-back"
+              size={24}
+              color={colors.textPrimary}
+            />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <AppText variant="subheading">{params.name ?? 'Mesaj'}</AppText>
+            {isConnected && <View style={styles.onlineDot} />}
+          </View>
+          <View style={styles.iconBtn} />
         </View>
-        <View style={styles.iconBtn} />
-      </View>
 
-      <FlatList
-        data={messages}
-        keyExtractor={item => item.id}
-        renderItem={renderMessage}
-        inverted
-        contentContainerStyle={styles.messageList}
-        showsVerticalScrollIndicator={false}
-      />
-
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Mesaj yaz..."
-          placeholderTextColor={colors.textSecondary}
-          multiline
-          maxLength={1000}
-          returnKeyType="default"
+        <FlatList
+          data={messages}
+          keyExtractor={item => item.id}
+          renderItem={renderMessage}
+          inverted
+          contentContainerStyle={styles.messageList}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
-          onPress={sendMessage}
-          disabled={!input.trim()}
-          activeOpacity={0.7}>
-          <MaterialIcon name="send" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Mesaj yaz..."
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            maxLength={1000}
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            blurOnSubmit
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!input.trim()}
+            activeOpacity={0.7}>
+            <MaterialIcon name="send" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: colors.bg},
+  kav: {flex: 1},
   navHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,7 +258,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  iconBtn: {width: 40, height: 40, justifyContent: 'center', alignItems: 'center'},
+  iconBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   headerCenter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,16 +321,15 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 20,
   },
-  msgTextOwn: {
-    color: colors.textPrimary,
-  },
   msgTime: {
     fontSize: 10,
     color: colors.textSecondary,
     alignSelf: 'flex-end',
   },
   msgTimeOwn: {
+    fontSize: 10,
     color: 'rgba(255,255,255,0.6)',
+    alignSelf: 'flex-end',
   },
   inputBar: {
     flexDirection: 'row',

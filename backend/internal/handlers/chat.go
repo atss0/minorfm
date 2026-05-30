@@ -105,10 +105,10 @@ func (h *Handler) GetRoomMessages(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"data": messages})
 }
 
-// GetRooms returns all available chat rooms.
+// GetRooms returns public chat rooms (excludes DM rooms).
 func (h *Handler) GetRooms(c *fiber.Ctx) error {
 	var rooms []models.ChatRoom
-	if err := h.DB.Order("name ASC").Find(&rooms).Error; err != nil {
+	if err := h.DB.Where("type != 'dm'").Order("name ASC").Find(&rooms).Error; err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "could not fetch rooms")
 	}
 	return c.JSON(fiber.Map{"rooms": rooms})

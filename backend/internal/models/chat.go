@@ -15,6 +15,14 @@ type ChatRoom struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// ChatRoomMember tracks membership for DM/group rooms.
+type ChatRoomMember struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	RoomID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_room_user" json:"room_id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_room_user" json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ChatMessage stores a string room_id (slug or UUID) for flexibility.
 type ChatMessage struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
