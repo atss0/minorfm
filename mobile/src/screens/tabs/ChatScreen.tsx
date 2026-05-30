@@ -64,7 +64,7 @@ export default function ChatScreen() {
     setAutoScroll(val);
   };
 
-  const {currentIndex, isPlaying, progress, play, pause, resume} = useRecordingsPlayer();
+  const {currentIndex, isPlaying, progress, play} = useRecordingsPlayer();
   const queryClient = useQueryClient();
 
   const {data: recData, isRefetching, refetch} = useQuery({
@@ -84,15 +84,16 @@ export default function ChatScreen() {
     async (recording: RecordingItem, listIndex: number) => {
       try {
         const recIndex = recordings.indexOf(recording);
-        const isSameAndPlaying = currentIndex === recIndex && isPlaying;
-        if (isSameAndPlaying) { await pause(); return; }
-        if (currentIndex === recIndex && !isPlaying) { await resume(); return; }
+        if (recIndex === -1) return;
+        // useRecordingsPlayer.play() handles pause/resume internally via
+        // isSameTrack check — don't call resume() here which would resume
+        // the radio stream when store index happens to match by coincidence.
         await play(recordings, recIndex);
       } catch {
         showMessage({message: 'Kayıt çalınamadı', type: 'danger'});
       }
     },
-    [currentIndex, isPlaying, pause, resume, play, recordings],
+    [play, recordings],
   );
 
   const handleLongPress = useCallback(

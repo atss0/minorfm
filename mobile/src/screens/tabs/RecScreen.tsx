@@ -351,6 +351,8 @@ const styles = StyleSheet.create({
     fontWeight: '200',
     color: colors.textPrimary,
     letterSpacing: 2,
+    lineHeight: 58,
+    includeFontPadding: false,
     fontVariant: ['tabular-nums'],
     marginBottom: spacing.sm,
   },

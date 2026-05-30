@@ -12,12 +12,18 @@ import HapticFeedback from 'react-native-haptic-feedback';
 import AppText from './AppText';
 import {colors, spacing, radius, PLAYER_HEADER_HEIGHT} from '../theme';
 import {useStream} from '../hooks/useStream';
+import {useRecordingsStore} from '../stores/recordingsStore';
 import {radioApi} from '../api/radio';
 
 const HAPTIC_OPTIONS = {enableVibrateFallback: true, ignoreAndroidSystemSettings: false};
 
 export default function PlayerHeader() {
   const {isPlaying, isBuffering, currentMeta, togglePlay} = useStream();
+  const recordingIsPlaying = useRecordingsStore(s => s.isPlaying);
+  // Don't show buffering state when a recording is playing — TrackPlayer is
+  // shared and its state changes during recording playback shouldn't affect
+  // the radio header display.
+  const showBuffering = isBuffering && !recordingIsPlaying;
 
   const heartScale = useSharedValue(1);
   const heartColor = useSharedValue(0);
@@ -60,7 +66,7 @@ export default function PlayerHeader() {
 
       {/* Artist / title */}
       <View style={styles.meta}>
-        {isBuffering ? (
+        {showBuffering ? (
           <AppText variant="caption" style={styles.connecting}>
             Bağlanıyor...
           </AppText>
