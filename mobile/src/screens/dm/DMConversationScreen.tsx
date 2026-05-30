@@ -57,7 +57,7 @@ export default function DMConversationScreen() {
       .then(res => {
         // Backend returns oldest-first after its internal reverse; keep that order.
         // FlatList is inverted so data[0] = newest = shown at bottom.
-        const raw: Record<string, unknown>[] = res.data?.messages ?? res.data ?? [];
+        const raw: Record<string, unknown>[] = res.data?.data ?? res.data?.messages ?? [];
         const normalized: Message[] = raw.map(m => ({
           id: m.id as string,
           user_id: (m.user_id ?? m.userId) as string,
