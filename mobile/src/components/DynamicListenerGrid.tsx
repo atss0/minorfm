@@ -144,7 +144,8 @@ export default function DynamicListenerGrid({
     () =>
       Gesture.Tap()
         .numberOfTaps(2)
-        .maxDuration(300)
+        .maxDuration(500)
+        .maxDelay(350)
         .onStart(() => {
           'worklet';
           runOnJS(handleDoubleTap)();
