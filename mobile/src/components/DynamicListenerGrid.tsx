@@ -25,7 +25,7 @@ interface Props {
 }
 
 const SUPERLIKE_MS = 3000;
-const HEART_TAP_MS = 30_000;
+const HEART_TAP_MS = 10_000;
 const HAPTIC_OPTIONS = {enableVibrateFallback: true, ignoreAndroidSystemSettings: false};
 
 export default function DynamicListenerGrid({
